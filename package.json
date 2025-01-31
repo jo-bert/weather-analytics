@@ -1,11 +1,4 @@
 {
-    "private": true,
-    "type": "module",
-    "scripts": {
-        "build": "vue-tsc && vite build && vite build --ssr",
-        "dev": "vite",
-        "lint": "eslint resources/js --ext .js,.ts,.vue --ignore-path .gitignore --fix"
-    },
     "devDependencies": {
         "@inertiajs/vue3": "^2.0.0",
         "@rushstack/eslint-patch": "^1.8.0",
@@ -29,5 +22,15 @@
         "vite": "^6.0",
         "vue": "^3.4.0",
         "vue-tsc": "^2.0.24"
+    },
+    "private": true,
+    "scripts": {
+        "build": "vue-tsc && vite build && vite build --ssr",
+        "dev": "vite",
+        "lint": "eslint resources/js --ext .js,.ts,.vue --ignore-path .gitignore --fix"
+    },
+    "type": "module",
+    "dependencies": {
+        "daisyui": "^4.12.23"
     }
 }

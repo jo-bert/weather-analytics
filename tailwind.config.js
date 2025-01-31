@@ -9,14 +9,13 @@ export default {
         './resources/views/**/*.blade.php',
         './resources/js/**/*.vue',
     ],
+		theme: {
+			extend: {
+					fontFamily: {
+							sans: ['Figtree', ...defaultTheme.fontFamily.sans],
+					},
+			},
+	},
 
-    theme: {
-        extend: {
-            fontFamily: {
-                sans: ['Figtree', ...defaultTheme.fontFamily.sans],
-            },
-        },
-    },
-
-    plugins: [forms],
+    plugins: [forms, require('daisyui'),],
 };

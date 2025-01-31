@@ -24,6 +24,13 @@ services:
         depends_on:
             - pgsql
             - redis
+        healthcheck:
+            test:
+                - CMD
+                - curl
+                - 'http://localhost/up'
+            retries: 3
+            timeout: 5s
     pgsql:
         image: 'postgres:17'
         ports:

@@ -6,6 +6,7 @@ import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
+import { onMounted } from 'vue';
 
 defineProps<{
     canResetPassword?: boolean;
@@ -25,6 +26,13 @@ const submit = () => {
         },
     });
 };
+
+onMounted(() => {
+    fetch(route('location.index') + '?city=a')
+    .then(response => response.json())
+    .then(data => console.log(data))
+    .catch(error => console.error('Error fetching data:', error));
+});
 </script>
 
 <template>
