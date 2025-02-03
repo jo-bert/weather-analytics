@@ -27,7 +27,8 @@ Route::middleware('auth')->group(function () {
 });
 
 Route::prefix('location')->group(function () {
-    Route::get('/', [LocationController::class, 'index'])->name('location.index');
+    Route::get('/', [LocationController::class, 'index'])->name('locations.index');
+    Route::post('/', [LocationController::class, 'submit'])->name('locations.submit');
 });
 
 require __DIR__ . '/auth.php';
