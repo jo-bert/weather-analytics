@@ -26,6 +26,9 @@ class LocationController extends Controller
 
     public function index()
     {
+        // return Inertia::render('Error', ['status' => 500])
+        //     ->toResponse(new Request())
+        //     ->setStatusCode(500);
         return Inertia::render('Locations/Index', [
             'nearestLocation' => null,
             'locations' => Cache::remember('users', now()->addMinute(), function () {
@@ -34,6 +37,8 @@ class LocationController extends Controller
             'countries' => Cache::remember('countries', now()->addMinute(), function () {
                 return Location::all()->pluck('country')->unique()->values()->toArray();
             }),
+            'message' => '',
+            'messageType' => ''
         ]);
     }
 
@@ -46,13 +51,26 @@ class LocationController extends Controller
         if ($lat !== 0 || $long !== 0) {
             $nearestLocationArray = FacadesDB::select('SELECT * FROM find_nearest_location(?, ?)', [$lat, $long]);
             $this->nearestLocation = !empty($nearestLocationArray) ? Location::find($nearestLocationArray[0]->id) : null;
-        } else if ($location !== '') {
+        } else if ($location !== null) {
             $this->nearestLocation = Location::where('name', $location)->first();
-            Log::info($location);
         } else {
-            return redirect()->route('locations.index');
+            return Inertia::render('Locations/Index', [
+                'nearestLocation' => null,
+                'locations' => Cache::remember('users', now()->addMinute(), function () {
+                    return Location::all();
+                }),
+                'countries' => Cache::remember('countries', now()->addMinute(), function () {
+                    return Location::all()->pluck('country')->unique()->values()->toArray();
+                }),
+                'country' => '',
+                'location' => '',
+                'messageType' => 'error',
+                'message' => 'Please select a location'
+            ]);
         }
 
+
+        $currentWeatherResponse = Http::get("http://api.weatherapi.com/v1/current.json?key={$this->weatherApiKey}&q={$this->nearestLocation->name}&aqi=no");
         if (($lat && $long && $this->nearestLocation->distance <= 50) || ($location && $this->nearestLocation)) {
             $latestForecast = HourlyForecast::where('location_id', $this->nearestLocation->id)->orderBy('time_epoch', 'desc')->first();
             $latestUpdatedTime = Carbon::parse($latestForecast->updated_at);
@@ -60,7 +78,10 @@ class LocationController extends Controller
             if ($latestUpdatedTime->diffInHours($currentTime) >= 1) {
                 Log::info("Hourly forecast for {$this->nearestLocation->name} is outdated. Updating one now and getting from the API instead");
                 GatherWeatherData::dispatch($this->nearestLocation->name);
+                $weather =  $this->getDailyForecast($this->nearestLocation->name);
                 return Inertia::render('Locations/Index', [
+                    'messageType' => 'warning',
+                    'message' => 'Data is from a third-party source and may vary slightly',
                     'nearestLocation' => $this->nearestLocation->name,
                     'locations' => Cache::remember('users', now()->addMinute(), function () {
                         return Location::all();
@@ -70,14 +91,19 @@ class LocationController extends Controller
                     }),
                     'country' => $this->nearestLocation->country,
                     'location' => $this->nearestLocation->name,
-                    'weather' => $this->getDailyForecast($this->nearestLocation->name)
+                    'weather' => $weather,
+                    'currentWeather' => $currentWeatherResponse->ok() ? $currentWeatherResponse['current'] : null,
                 ]);
             } else {
                 // HourlyForecast::where('location_id', $this->nearestLocation->id)
                 // ->whereBetween('time_epoch', [Carbon::now()->subDays(7)->timestamp, Carbon::now()->addDays(7)->timestamp])->get()
                 $weatherData = collect([]);
                 for ($j = -6; $j <= 7; $j++) {
-                    $weatherData = $weatherData->merge(FacadesDB::select('SELECT * FROM get_daily_stat(?, ?, ?)', [Carbon::now()->addDays($j - 1)->getTimestamp(), Carbon::now()->addDays($j)->getTimestamp(), $this->nearestLocation->id]));
+                    $weather = FacadesDB::select('SELECT * FROM get_daily_stat(?, ?, ?)', [Carbon::now()->addDays($j - 1)->getTimestamp(), Carbon::now()->addDays($j)->getTimestamp(), $this->nearestLocation->id]);
+                    foreach ($weather as &$record) {
+                        $record->date = Carbon::now()->addDays($j - 1)->format('Y-m-d');
+                    }
+                    $weatherData = $weatherData->merge(json_decode(json_encode($weather)));
                 }
                 return Inertia::render('Locations/Index', [
                     'nearestLocation' => $this->nearestLocation->name,
@@ -89,14 +115,15 @@ class LocationController extends Controller
                     }),
                     'country' => $this->nearestLocation->country,
                     'location' => $this->nearestLocation->name,
-                    'weather' => $weatherData
+                    'weather' => $weatherData->toArray()
                 ]);
             }
         } else {
-            $response = Http::get("http://api.weatherapi.com/v1/search.json?key={$this->weatherApiKey}&q={$lat}, {$long}");
+            $response = Http::get(url: "http://api.weatherapi.com/v1/search.json?key={$this->weatherApiKey}&q={$lat}, {$long}");
             GatherWeatherData::dispatchSync($response->json()[0]['name']);
             return Inertia::render('Locations/Index', [
-                'nearestLocation' => 'Getting the weather of past 7 days and next 2 days for few minutes. Please wait',
+                'messageType' => 'warning',
+                'message' => 'Data is from a third-party source and may vary slightly',
                 'locations' => Cache::remember('users', now()->addMinute(), function () {
                     return Location::all()->filter(function ($location) {
                         return $location->name !== 'Singapore';
@@ -106,7 +133,8 @@ class LocationController extends Controller
                     return Location::all()->pluck('country')->unique()->values()->toArray();
                 }),
                 'country' => $response->json()[0]['country'],
-                'location' => $response->json()[0]['name']
+                'location' => $response->json()[0]['name'],
+                'weather' => $this->getDailyForecast($this->nearestLocation->name)
             ]);
         }
     }
@@ -115,7 +143,7 @@ class LocationController extends Controller
     {
         $aggregratedData = collect([]);
         $keys = ['condition_text', 'condition_icon', 'condition_code'];
-        for ($j = -7; $j <= 2; $j++) {
+        for ($j = -7; $j <= 0; $j++) {
             $date = now()->addDays($j)->format('Y-m-d');
             $response = Http::get("http://api.weatherapi.com/v1/history.json?key={$this->weatherApiKey}&q={$city}&dt={$date}");
             if (!$response->ok()) {
@@ -127,16 +155,22 @@ class LocationController extends Controller
                 $todayWeather[$keys[$i]] = $values[$i];
             }
             $todayWeather['condition'] = null;
+            $todayWeather['date'] = $date;
             $aggregratedData = $aggregratedData->add($todayWeather);
         }
         $response = Http::get("http://api.weatherapi.com/v1/forecast.json?key={$this->weatherApiKey}&q={$city}&days=7");
         foreach ($response['forecast']['forecastday'] as $forecastDay) {
-            $values = [$forecastDay['day']['condition']['text'], $forecastDay['day']['condition']['icon'], $forecastDay['day']['condition']['code']];
-            for ($i = 0; $i < count($keys); $i++) {
-                $forecastDay[$keys[$i]] = $values[$i];
+            if ($forecastDay['date'] === Carbon::now()->format('Y-m-d')) {
+                continue;
             }
-            $forecastDay['condition'] = null;
-            $aggregratedData = $aggregratedData->add($todayWeather);
+            $dayInfo = $forecastDay['day'];
+            $values = [$dayInfo['condition']['text'], $dayInfo['condition']['icon'], $dayInfo['condition']['code']];
+            for ($i = 0; $i < count($keys); $i++) {
+                $dayInfo[$keys[$i]] = $values[$i];
+            }
+            $dayInfo['condition'] = null;
+            $dayInfo['date'] = Carbon::createFromTimestamp($forecastDay['date_epoch'])->format('Y-m-d');
+            $aggregratedData = $aggregratedData->add($dayInfo);
         }
         return $aggregratedData;
     }
