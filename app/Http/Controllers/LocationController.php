@@ -26,9 +26,6 @@ class LocationController extends Controller
 
     public function index()
     {
-        // return Inertia::render('Error', ['status' => 500])
-        //     ->toResponse(new Request())
-        //     ->setStatusCode(500);
         return Inertia::render('Locations/Index', [
             'nearestLocation' => null,
             'locations' => Cache::remember('users', now()->addMinute(), function () {
@@ -76,7 +73,7 @@ class LocationController extends Controller
             $latestUpdatedTime = Carbon::parse($latestForecast->updated_at);
             $currentTime = Carbon::now();
             if ($latestUpdatedTime->diffInHours($currentTime) >= 1) {
-                Log::info("Hourly forecast for {$this->nearestLocation->name} is outdated. Updating one now and getting from the API instead");
+                // Log::info("Hourly forecast for {$this->nearestLocation->name} is outdated. Updating one now and getting from the API instead");
                 GatherWeatherData::dispatch($this->nearestLocation->name);
                 $weather =  $this->getDailyForecast($this->nearestLocation->name);
                 return Inertia::render('Locations/Index', [
@@ -93,6 +90,8 @@ class LocationController extends Controller
                     'location' => $this->nearestLocation->name,
                     'weather' => $weather,
                     'currentWeather' => $currentWeatherResponse->ok() ? $currentWeatherResponse['current'] : null,
+                    'todayHourlyForecast' => HourlyForecast::where('location_id', $this->nearestLocation->id)
+                        ->whereBetween('time_epoch', [Carbon::now()->timestamp, Carbon::now()->addHours(value: 24)->timestamp])->select(['time', 'temp_c', 'temp_f', 'precip_mm', 'precip_in'])->orderBy('time_epoch')->get()
                 ]);
             } else {
                 // HourlyForecast::where('location_id', $this->nearestLocation->id)
@@ -115,7 +114,10 @@ class LocationController extends Controller
                     }),
                     'country' => $this->nearestLocation->country,
                     'location' => $this->nearestLocation->name,
-                    'weather' => $weatherData->toArray()
+                    'weather' => $weatherData->toArray(),
+                    'currentWeather' => $currentWeatherResponse->ok() ? $currentWeatherResponse['current'] : null,
+                    'todayHourlyForecast' => HourlyForecast::where('location_id', $this->nearestLocation->id)
+                        ->whereBetween('time_epoch', [Carbon::now()->timestamp, Carbon::now()->addHours(value: 24)->timestamp])->select(['time', 'temp_c', 'temp_f', 'precip_mm', 'precip_in'])->orderBy('time_epoch')->get()
                 ]);
             }
         } else {
@@ -134,7 +136,10 @@ class LocationController extends Controller
                 }),
                 'country' => $response->json()[0]['country'],
                 'location' => $response->json()[0]['name'],
-                'weather' => $this->getDailyForecast($this->nearestLocation->name)
+                'weather' => $this->getDailyForecast($this->nearestLocation->name),
+                'currentWeather' => $currentWeatherResponse->ok() ? $currentWeatherResponse['current'] : null,
+                'todayHourlyForecast' => HourlyForecast::where('location_id', $this->nearestLocation->id)
+                    ->whereBetween('time_epoch', [Carbon::now()->timestamp, Carbon::now()->addDays(value: 24)->timestamp])->only(['time', 'temp_c', 'temp_f', 'precip_mm', 'precip_in'])->orderBy('time_epoch')->get()
             ]);
         }
     }
@@ -143,11 +148,17 @@ class LocationController extends Controller
     {
         $aggregratedData = collect([]);
         $keys = ['condition_text', 'condition_icon', 'condition_code'];
+        $maxAttempts = 3;
         for ($j = -7; $j <= 0; $j++) {
             $date = now()->addDays($j)->format('Y-m-d');
-            $response = Http::get("http://api.weatherapi.com/v1/history.json?key={$this->weatherApiKey}&q={$city}&dt={$date}");
+            $attempts = 0;
+            do {
+                $response = Http::get("http://api.weatherapi.com/v1/history.json?key={$this->weatherApiKey}&q={$city}&dt={$date}");
+                $attempts++;
+            } while (!$response->ok() && $attempts < $maxAttempts);
             if (!$response->ok()) {
-                break;
+                Log::error("Failed to fetch weather data for {$date} after {$maxAttempts} attempts.");
+                continue;
             }
             $todayWeather = $response->json()['forecast']['forecastday'][0]['day'];
             $values = [$todayWeather['condition']['text'], $todayWeather['condition']['icon'], $todayWeather['condition']['code']];
@@ -158,7 +169,16 @@ class LocationController extends Controller
             $todayWeather['date'] = $date;
             $aggregratedData = $aggregratedData->add($todayWeather);
         }
-        $response = Http::get("http://api.weatherapi.com/v1/forecast.json?key={$this->weatherApiKey}&q={$city}&days=7");
+        $attempts = 0;
+        do {
+            $response = Http::get("http://api.weatherapi.com/v1/forecast.json?key={$this->weatherApiKey}&q={$city}&days=7");
+            $attempts++;
+        } while (!$response->ok() && $attempts < $maxAttempts);
+        if (!$response->ok()) {
+            Log::error("Failed to fetch forecast data after {$maxAttempts} attempts.");
+            return $aggregratedData;
+        }
+        Log::info($response);
         foreach ($response['forecast']['forecastday'] as $forecastDay) {
             if ($forecastDay['date'] === Carbon::now()->format('Y-m-d')) {
                 continue;
