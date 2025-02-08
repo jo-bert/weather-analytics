@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import Leafet from '@/Components/Leafet.vue';
 import { Head, useForm } from '@inertiajs/vue3';
 import {
     BarController,
@@ -13,7 +14,7 @@ import {
     PointElement,
     Tooltip,
 } from 'chart.js';
-import { MapIcon, MapPinIcon } from 'lucide-vue-next';
+import { MapPinIcon } from 'lucide-vue-next';
 import {
     computed,
     nextTick,
@@ -50,7 +51,7 @@ const props = defineProps<{
     currentWeather: Object;
     todayHourlyForecast: Object[];
 }>();
-
+console.log(props.currentWeather);
 const form = useForm({
     location: '',
     country: '',
@@ -229,6 +230,21 @@ onMounted(() => {
         });
     }
 });
+
+const toolTipElement = computed(() => {
+    const myDiv = document.createElement('div');
+    myDiv.innerHTML =
+        '<h1>' +
+        props.nearestLocation +
+        '</h1><p>Latitude: ' +
+        form.lat +
+        '</p><p>Longitude: ' +
+        form.long +
+        '</p><p>Temperature: ' +
+        '</p>';
+
+    return myDiv;
+});
 </script>
 
 <template>
@@ -325,16 +341,16 @@ onMounted(() => {
                                 <p class="text-4xl font-bold">
                                     {{
                                         isMetric
-                                            ? currentWeather.temp_c
-                                            : currentWeather.temp_f
+                                            ? currentWeather.current.temp_c
+                                            : currentWeather.current.temp_f
                                     }}°{{ isMetric ? 'C' : 'F' }}
                                 </p>
                                 <p class="text-gray-600">
-                                    {{ currentWeather.condition.text }}
+                                    {{ currentWeather.current.condition.text }}
                                 </p>
                             </div>
                             <img
-                                :src="`https:${currentWeather.condition.icon}`"
+                                :src="`https:${currentWeather.current.condition.icon}`"
                                 class="h-24 w-24 text-sky-500"
                             />
                         </div>
@@ -361,13 +377,17 @@ onMounted(() => {
 
                 <!-- Middle Column: Map Placeholder -->
                 <div class="lg:col-span-1">
-                    <div class="h-full rounded-lg bg-white p-6 shadow-lg">
+                    <div
+                        v-if="currentWeather"
+                        class="h-full rounded-lg bg-white p-6 shadow-lg"
+                    >
                         <h2 class="mb-4 text-2xl font-semibold">Weather Map</h2>
-                        <div
-                            class="flex h-[calc(100%-2rem)] items-center justify-center rounded bg-gray-200"
-                        >
-                            <MapIcon class="h-16 w-16 text-gray-400" />
-                            <p class="ml-2 text-gray-600">Map placeholder</p>
+                        <div class="flex h-[calc(100%-2rem)]">
+                            <Leafet
+                                :lat="currentWeather.location.lat"
+                                :long="currentWeather.location.lon"
+                                :tooltip="toolTipElement"
+                            />
                         </div>
                     </div>
                 </div>
@@ -438,7 +458,9 @@ onMounted(() => {
             class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 p-4"
             @click="selectedForecast = false"
         >
-            <div class="w-full max-w-md rounded-lg bg-white p-8 shadow-lg">
+            <div
+                class="z-[401] w-full max-w-md rounded-lg bg-white p-8 shadow-lg"
+            >
                 <h3 class="mb-6 text-2xl font-semibold">
                     {{
                         new Date(selectedForecast.date).toLocaleDateString() ===

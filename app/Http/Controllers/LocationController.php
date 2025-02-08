@@ -89,7 +89,7 @@ class LocationController extends Controller
                     'country' => $this->nearestLocation->country,
                     'location' => $this->nearestLocation->name,
                     'weather' => $weather,
-                    'currentWeather' => $currentWeatherResponse->ok() ? $currentWeatherResponse['current'] : null,
+                    'currentWeather' => $currentWeatherResponse->ok() ? $currentWeatherResponse->json() : null,
                     'todayHourlyForecast' => HourlyForecast::where('location_id', $this->nearestLocation->id)
                         ->whereBetween('time_epoch', [Carbon::now()->timestamp, Carbon::now()->addHours(value: 24)->timestamp])->select(['time', 'temp_c', 'temp_f', 'precip_mm', 'precip_in'])->orderBy('time_epoch')->get()
                 ]);
@@ -115,7 +115,7 @@ class LocationController extends Controller
                     'country' => $this->nearestLocation->country,
                     'location' => $this->nearestLocation->name,
                     'weather' => $weatherData->toArray(),
-                    'currentWeather' => $currentWeatherResponse->ok() ? $currentWeatherResponse['current'] : null,
+                    'currentWeather' => $currentWeatherResponse->ok() ? $currentWeatherResponse->json() : null,
                     'todayHourlyForecast' => HourlyForecast::where('location_id', $this->nearestLocation->id)
                         ->whereBetween('time_epoch', [Carbon::now()->timestamp, Carbon::now()->addHours(value: 24)->timestamp])->select(['time', 'temp_c', 'temp_f', 'precip_mm', 'precip_in'])->orderBy('time_epoch')->get()
                 ]);
@@ -137,7 +137,7 @@ class LocationController extends Controller
                 'country' => $response->json()[0]['country'],
                 'location' => $response->json()[0]['name'],
                 'weather' => $this->getDailyForecast($this->nearestLocation->name),
-                'currentWeather' => $currentWeatherResponse->ok() ? $currentWeatherResponse['current'] : null,
+                'currentWeather' => $currentWeatherResponse->ok() ? $currentWeatherResponse->json() : null,
                 'todayHourlyForecast' => HourlyForecast::where('location_id', $this->nearestLocation->id)
                     ->whereBetween('time_epoch', [Carbon::now()->timestamp, Carbon::now()->addDays(value: 24)->timestamp])->only(['time', 'temp_c', 'temp_f', 'precip_mm', 'precip_in'])->orderBy('time_epoch')->get()
             ]);
