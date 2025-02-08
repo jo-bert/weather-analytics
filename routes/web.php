@@ -1,7 +1,7 @@
 <?php
 
 use App\Http\Controllers\LocationController;
-use App\Http\Controllers\LocationsController;
+use App\Http\Controllers\HourlyController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
@@ -31,4 +31,10 @@ Route::prefix('location')->group(function () {
     Route::post('/', [LocationController::class, 'submit'])->name('locations.submit');
 });
 
+Route::get('/hourly-forecasts/range', [HourlyController::class, 'getByRange']);
+Route::get('/hourly-forecasts', [HourlyController::class, 'index']);
+Route::post('/hourly-forecasts', [HourlyController::class, 'store'])->middleware(['auth', 'verified']);
+Route::get('/hourly-forecasts/{id}', [HourlyController::class, 'show']);
+Route::put('/hourly-forecasts/{id}', [HourlyController::class, 'update'])->middleware(['auth', 'verified']);
+Route::delete('/hourly-forecasts/{id}', [HourlyController::class, 'destroy'])->middleware(['auth', 'verified']);
 require __DIR__ . '/auth.php';
