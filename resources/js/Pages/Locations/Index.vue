@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ForecastModal from '@/Components/ForecastModal.vue';
 import Leafet from '@/Components/Leafet.vue';
 import { Head, useForm } from '@inertiajs/vue3';
 import {
@@ -26,6 +27,7 @@ import {
     watch,
 } from 'vue';
 import { ModelListSelect } from 'vue-search-select';
+import { CurrentWeather } from '../../types';
 
 Chart.register(
     BarController,
@@ -45,13 +47,14 @@ const props = defineProps<{
     locations: Object[];
     countries: string[];
     location: string;
+    location_id: number;
     weather: Object[];
     messageType: string;
     message: string;
-    currentWeather: Object;
+    currentWeather: CurrentWeather;
     todayHourlyForecast: Object[];
 }>();
-console.log(props.currentWeather);
+
 const form = useForm({
     location: '',
     country: '',
@@ -62,13 +65,14 @@ const form = useForm({
 const selectedForecast = ref(null);
 const showError = ref(false);
 const errorMessage = ref('Error! Could not get the geolocation');
-
+const todayHourlyForecastRef = ref(null);
 const enterKey = () => {
     form.post(route('locations.submit'), {
         preserveState: true,
         onSuccess: (response) => {
             form.country = response.props.country;
             form.location = response.props.location;
+            todayHourlyForecastRef.value = response.props.todayHourlyForecast;
             if (response.props.message !== undefined) {
                 showError.value = true;
                 errorMessage.value = response.props.message as string;
@@ -138,6 +142,7 @@ const openModal = (day) => {
 
 const closeModal = () => {
     selectedForecast.value = null;
+    document.body.classList.remove('overflow-hidden');
 };
 
 // Polling mechanism
@@ -150,6 +155,8 @@ const startPolling = () => {
             onSuccess: (response) => {
                 form.country = response.props.country;
                 form.location = response.props.location;
+                todayHourlyForecastRef.value =
+                    response.props.todayHourlyForecast;
                 if (response.props.message !== undefined) {
                     showError.value = true;
                     errorMessage.value = response.props.message as string;
@@ -162,7 +169,7 @@ const startPolling = () => {
                 console.log('Polling failed:', error);
             },
         });
-    }, 10000); // Poll every 60 seconds
+    }, 10000);
 };
 
 onUnmounted(() => {
@@ -173,37 +180,39 @@ onUnmounted(() => {
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 const chartRef = shallowRef(null);
 watch(isMetric, () => {
-    if (chartRef.value && props.todayHourlyForecast) {
+    if (chartRef.value && todayHourlyForecastRef.value) {
         const chart = toRaw(chartRef.value);
         Object.assign(
             chart.config.data.datasets[1].data,
-            props.todayHourlyForecast.map((hour) =>
+            todayHourlyForecastRef.value.map((hour) =>
                 isMetric.value ? hour.temp_c : hour.temp_f,
             ),
         );
         Object.assign(
             chart.config.data.datasets[0].data,
-            props.todayHourlyForecast.map((hour) =>
+            todayHourlyForecastRef.value.map((hour) =>
                 isMetric.value ? hour.precip_mm : hour.precip_in,
             ),
         );
         nextTick(() => {
             chart.update();
         });
-        console.log('aaa');
     }
 });
 
 onMounted(() => {
     if (form.location) startPolling();
-    if (props.todayHourlyForecast) {
-        const lineDataset = props.todayHourlyForecast.map((hour) =>
+});
+
+watch(todayHourlyForecastRef, () => {
+    if (todayHourlyForecastRef.value) {
+        const lineDataset = todayHourlyForecastRef.value.map((hour) =>
             isMetric.value ? hour.temp_c : hour.temp_f,
         );
-        const barDataset = props.todayHourlyForecast.map((hour) =>
+        const barDataset = todayHourlyForecastRef.value.map((hour) =>
             isMetric.value ? hour.precip_mm : hour.precip_in,
         );
-        const labels = props.todayHourlyForecast.map((hour) => {
+        const labels = todayHourlyForecastRef.value.map((hour) => {
             //Revisit this whether we need to add + '+00:00' or not
             const date = new Date(hour.time);
             return date.toLocaleTimeString([], {
@@ -229,21 +238,6 @@ onMounted(() => {
             },
         });
     }
-});
-
-const toolTipElement = computed(() => {
-    const myDiv = document.createElement('div');
-    myDiv.innerHTML =
-        '<h1>' +
-        props.nearestLocation +
-        '</h1><p>Latitude: ' +
-        form.lat +
-        '</p><p>Longitude: ' +
-        form.long +
-        '</p><p>Temperature: ' +
-        '</p>';
-
-    return myDiv;
 });
 </script>
 
@@ -287,18 +281,29 @@ const toolTipElement = computed(() => {
                                 />
                             </div>
                             <button
+                                :disabled="form.processing"
+                                type="submit"
                                 class="mb-2 flex w-full items-center justify-center rounded-md bg-sky-500 p-2 text-white hover:bg-sky-600 focus:outline-none focus:ring-2 focus:ring-sky-500"
                             >
                                 Submit
                             </button>
                         </form>
                         <button
+                            :disabled="form.processing"
                             @click="getUserCoordinate"
                             class="mb-2 flex w-full items-center justify-center rounded-md bg-sky-500 p-2 text-white hover:bg-sky-600 focus:outline-none focus:ring-2 focus:ring-sky-500"
                         >
                             <MapPinIcon class="mr-2 h-5 w-5" />
                             Use Current Location
                         </button>
+                        <progress
+                            v-if="form.progress"
+                            :value="form.progress.percentage"
+                            max="100"
+                        >
+                            {{ form.progress.percentage }}%
+                        </progress>
+
                         <div class="mb-4 flex justify-end">
                             <label
                                 class="inline-flex cursor-pointer items-center"
@@ -355,6 +360,7 @@ const toolTipElement = computed(() => {
                             />
                         </div>
                         <canvas ref="canvasRef"></canvas>
+
                         <button
                             class="mt-3 flex w-full items-center justify-center rounded-md bg-sky-500 p-2 text-white hover:bg-sky-600 focus:outline-none focus:ring-2 focus:ring-sky-500"
                             @click="
@@ -379,14 +385,16 @@ const toolTipElement = computed(() => {
                 <div class="lg:col-span-1">
                     <div
                         v-if="currentWeather"
-                        class="h-full rounded-lg bg-white p-6 shadow-lg"
+                        class="h-full rounded-lg bg-white p-6 shadow-lg lg:h-1/2"
                     >
                         <h2 class="mb-4 text-2xl font-semibold">Weather Map</h2>
-                        <div class="flex h-[calc(100%-2rem)]">
+                        <div
+                            class="flex h-[calc(100%-2rem)]"
+                            :class="{ hidden: selectedForecast }"
+                        >
                             <Leafet
-                                :lat="currentWeather.location.lat"
-                                :long="currentWeather.location.lon"
-                                :tooltip="toolTipElement"
+                                :currentWeather="currentWeather"
+                                :isMetric="isMetric"
                             />
                         </div>
                     </div>
@@ -452,144 +460,13 @@ const toolTipElement = computed(() => {
             </div>
         </div>
 
-        <!-- Modal -->
-        <div
+        <ForecastModal
             v-if="selectedForecast"
-            class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 p-4"
-            @click="selectedForecast = false"
-        >
-            <div
-                class="z-[401] w-full max-w-md rounded-lg bg-white p-8 shadow-lg"
-            >
-                <h3 class="mb-6 text-2xl font-semibold">
-                    {{
-                        new Date(selectedForecast.date).toLocaleDateString() ===
-                        new Date().toLocaleDateString()
-                            ? "Today's"
-                            : selectedForecast.date
-                    }}
-                    Forecast
-                </h3>
-
-                <div class="mb-6 flex items-center justify-between">
-                    <img
-                        :src="selectedForecast.condition_icon"
-                        :alt="selectedForecast.condition_text"
-                        class="h-24 w-24"
-                    />
-                    <div class="text-right">
-                        <p class="text-4xl font-bold">
-                            {{
-                                isMetric
-                                    ? selectedForecast.avgtemp_c
-                                    : selectedForecast.avgtemp_f
-                            }}°{{ isMetric ? 'C' : 'F' }}
-                        </p>
-                        <p class="text-xl text-gray-600">
-                            {{ selectedForecast.condition_text }}
-                        </p>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <h4 class="mb-2 font-semibold">Temperature</h4>
-                        <p>
-                            Max:
-                            {{
-                                isMetric
-                                    ? selectedForecast.maxtemp_c
-                                    : selectedForecast.maxtemp_f
-                            }}°{{ isMetric ? 'C' : 'F' }}
-                        </p>
-                        <p>
-                            Min:
-                            {{
-                                isMetric
-                                    ? selectedForecast.mintemp_c
-                                    : selectedForecast.mintemp_f
-                            }}°{{ isMetric ? 'C' : 'F' }}
-                        </p>
-                        <p>
-                            Avg:
-                            {{
-                                isMetric
-                                    ? selectedForecast.avgtemp_c
-                                    : selectedForecast.avgtemp_f
-                            }}°{{ isMetric ? 'C' : 'F' }}
-                        </p>
-                    </div>
-                    <div>
-                        <h4 class="mb-2 font-semibold">Wind</h4>
-                        <p>
-                            Max:
-                            {{
-                                isMetric
-                                    ? selectedForecast.maxwind_kph
-                                    : selectedForecast.maxwind_mph
-                            }}
-                            {{ isMetric ? 'km/h' : 'mph' }}
-                        </p>
-                    </div>
-                    <div>
-                        <h4 class="mb-2 font-semibold">Precipitation</h4>
-                        <p>
-                            Total:
-                            {{
-                                isMetric
-                                    ? selectedForecast.totalprecip_mm
-                                    : selectedForecast.totalprecip_in
-                            }}
-                            {{ isMetric ? 'mm' : 'in' }}
-                        </p>
-                        <p>Snow: {{ selectedForecast.totalsnow_cm }} cm</p>
-                    </div>
-                    <div>
-                        <h4 class="mb-2 font-semibold">Visibility</h4>
-                        <p>
-                            Avg:
-                            {{
-                                isMetric
-                                    ? selectedForecast.avgvis_km
-                                    : selectedForecast.avgvis_miles
-                            }}
-                            {{ isMetric ? 'km' : 'miles' }}
-                        </p>
-                    </div>
-                    <div>
-                        <h4 class="mb-2 font-semibold">Humidity</h4>
-                        <p>Avg: {{ selectedForecast.avghumidity }}%</p>
-                    </div>
-                    <div>
-                        <h4 class="mb-2 font-semibold">UV Index</h4>
-                        <p>{{ selectedForecast.uv }}</p>
-                    </div>
-                </div>
-
-                <div class="mt-4">
-                    <h4 class="mb-2 font-semibold">Precipitation Chance</h4>
-                    <p>
-                        Rain: {{ selectedForecast.daily_chance_of_rain }}% ({{
-                            selectedForecast.daily_will_it_rain ? 'Yes' : 'No'
-                        }})
-                    </p>
-                    <p>
-                        Snow: {{ selectedForecast.daily_chance_of_snow }}% ({{
-                            selectedForecast.daily_will_it_snow ? 'Yes' : 'No'
-                        }})
-                    </p>
-                </div>
-                <p class="mb-6 text-lg text-gray-600">
-                    {{ selectedForecast.conditon_text }}
-                </p>
-                <button
-                    @click="closeModal"
-                    class="w-full rounded-md bg-sky-500 p-3 text-lg text-white hover:bg-sky-600 focus:outline-none focus:ring-2 focus:ring-sky-500"
-                >
-                    Close
-                </button>
-            </div>
-        </div>
+            :selectedForecast="selectedForecast"
+            :isMetric="isMetric"
+            :location_id="location_id"
+            @close:modal="closeModal"
+        />
     </div>
     <div class="toast toast-end toast-top">
         <div

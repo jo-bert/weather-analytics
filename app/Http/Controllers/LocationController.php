@@ -18,10 +18,13 @@ class LocationController extends Controller
 
     private ?Location $nearestLocation;
     private string $weatherApiKey;
+    private int $maxAttempts;
+
 
     public function __construct()
     {
         $this->weatherApiKey = env('WEATHER_API_KEY', '');
+        $this->maxAttempts = 3;
     }
 
     public function index()
@@ -66,8 +69,14 @@ class LocationController extends Controller
             ]);
         }
 
+        $currentWeatherResponse = null;
+        $attempts = 0;
+        do {
+            $currentWeatherResponse = Http::get("http://api.weatherapi.com/v1/current.json?key={$this->weatherApiKey}&q={$this->nearestLocation->name}&aqi=no");
+            $attempts++;
+        } while (!$currentWeatherResponse->ok() && $attempts < $this->maxAttempts);
 
-        $currentWeatherResponse = Http::get("http://api.weatherapi.com/v1/current.json?key={$this->weatherApiKey}&q={$this->nearestLocation->name}&aqi=no");
+
         if (($lat && $long && $this->nearestLocation->distance <= 50) || ($location && $this->nearestLocation)) {
             $latestForecast = HourlyForecast::where('location_id', $this->nearestLocation->id)->orderBy('time_epoch', 'desc')->first();
             $latestUpdatedTime = Carbon::parse($latestForecast->updated_at);
@@ -88,6 +97,7 @@ class LocationController extends Controller
                     }),
                     'country' => $this->nearestLocation->country,
                     'location' => $this->nearestLocation->name,
+                    'location_id' => $this->nearestLocation->id,
                     'weather' => $weather,
                     'currentWeather' => $currentWeatherResponse->ok() ? $currentWeatherResponse->json() : null,
                     'todayHourlyForecast' => HourlyForecast::where('location_id', $this->nearestLocation->id)
@@ -114,6 +124,7 @@ class LocationController extends Controller
                     }),
                     'country' => $this->nearestLocation->country,
                     'location' => $this->nearestLocation->name,
+                    'location_id' => $this->nearestLocation->id,
                     'weather' => $weatherData->toArray(),
                     'currentWeather' => $currentWeatherResponse->ok() ? $currentWeatherResponse->json() : null,
                     'todayHourlyForecast' => HourlyForecast::where('location_id', $this->nearestLocation->id)
@@ -136,6 +147,7 @@ class LocationController extends Controller
                 }),
                 'country' => $response->json()[0]['country'],
                 'location' => $response->json()[0]['name'],
+                'location_id' => $this->nearestLocation->id,
                 'weather' => $this->getDailyForecast($this->nearestLocation->name),
                 'currentWeather' => $currentWeatherResponse->ok() ? $currentWeatherResponse->json() : null,
                 'todayHourlyForecast' => HourlyForecast::where('location_id', $this->nearestLocation->id)
@@ -148,16 +160,15 @@ class LocationController extends Controller
     {
         $aggregratedData = collect([]);
         $keys = ['condition_text', 'condition_icon', 'condition_code'];
-        $maxAttempts = 3;
         for ($j = -7; $j <= 0; $j++) {
             $date = now()->addDays($j)->format('Y-m-d');
             $attempts = 0;
             do {
                 $response = Http::get("http://api.weatherapi.com/v1/history.json?key={$this->weatherApiKey}&q={$city}&dt={$date}");
                 $attempts++;
-            } while (!$response->ok() && $attempts < $maxAttempts);
+            } while (!$response->ok() && $attempts < $this->maxAttempts);
             if (!$response->ok()) {
-                Log::error("Failed to fetch weather data for {$date} after {$maxAttempts} attempts.");
+                Log::error("Failed to fetch weather data for {$date} after {$this->maxAttempts} attempts.");
                 continue;
             }
             $todayWeather = $response->json()['forecast']['forecastday'][0]['day'];
@@ -173,9 +184,9 @@ class LocationController extends Controller
         do {
             $response = Http::get("http://api.weatherapi.com/v1/forecast.json?key={$this->weatherApiKey}&q={$city}&days=7");
             $attempts++;
-        } while (!$response->ok() && $attempts < $maxAttempts);
+        } while (!$response->ok() && $attempts < $this->maxAttempts);
         if (!$response->ok()) {
-            Log::error("Failed to fetch forecast data after {$maxAttempts} attempts.");
+            Log::error("Failed to fetch forecast data after {$this->maxAttempts} attempts.");
             return $aggregratedData;
         }
         Log::info($response);
