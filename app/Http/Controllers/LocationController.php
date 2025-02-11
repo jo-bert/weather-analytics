@@ -31,8 +31,8 @@ class LocationController extends Controller
     {
         return Inertia::render('Locations/Index', [
             'nearestLocation' => null,
-            'locations' => Cache::remember('users', now()->addMinute(), function () {
-                return Location::all();
+            'locations' => Cache::remember('locations', now()->addMinute(), function () {
+                return Location::select(['id', 'name', 'country'])->get();
             }),
             'countries' => Cache::remember('countries', now()->addMinute(), function () {
                 return Location::all()->pluck('country')->unique()->values()->toArray();
@@ -56,8 +56,8 @@ class LocationController extends Controller
         } else {
             return Inertia::render('Locations/Index', [
                 'nearestLocation' => null,
-                'locations' => Cache::remember('users', now()->addMinute(), function () {
-                    return Location::all();
+                'locations' => Cache::remember('locations', now()->addMinute(), function () {
+                    return Location::select(['id', 'name', 'country'])->get();
                 }),
                 'countries' => Cache::remember('countries', now()->addMinute(), function () {
                     return Location::all()->pluck('country')->unique()->values()->toArray();
@@ -89,8 +89,8 @@ class LocationController extends Controller
                     'messageType' => 'warning',
                     'message' => 'Data is from a third-party source and may vary slightly',
                     'nearestLocation' => $this->nearestLocation->name,
-                    'locations' => Cache::remember('users', now()->addMinute(), function () {
-                        return Location::all();
+                    'locations' => Cache::remember('locations', now()->addMinute(), function () {
+                        return Location::select(['id', 'name', 'country'])->get();
                     }),
                     'countries' => Cache::remember('countries', now()->addMinute(), function () {
                         return Location::all()->pluck('country')->unique()->values()->toArray();
@@ -116,8 +116,8 @@ class LocationController extends Controller
                 }
                 return Inertia::render('Locations/Index', [
                     'nearestLocation' => $this->nearestLocation->name,
-                    'locations' => Cache::remember('users', now()->addMinute(), function () {
-                        return Location::all();
+                    'locations' => Cache::remember('locations', now()->addMinute(), function () {
+                        return Location::select(['id', 'name', 'country'])->get();
                     }),
                     'countries' => Cache::remember('countries', now()->addMinute(), function () {
                         return Location::all()->pluck(value: 'country')->unique()->values()->toArray();
@@ -137,10 +137,8 @@ class LocationController extends Controller
             return Inertia::render('Locations/Index', [
                 'messageType' => 'warning',
                 'message' => 'Data is from a third-party source and may vary slightly',
-                'locations' => Cache::remember('users', now()->addMinute(), function () {
-                    return Location::all()->filter(function ($location) {
-                        return $location->name !== 'Singapore';
-                    })->values()->toArray();
+                'locations' => Cache::remember('locations', now()->addMinute(), function () {
+                    return Location::select(['id', 'name', 'country'])->get();
                 }),
                 'countries' => Cache::remember('countries', now()->addMinute(), function () {
                     return Location::all()->pluck('country')->unique()->values()->toArray();

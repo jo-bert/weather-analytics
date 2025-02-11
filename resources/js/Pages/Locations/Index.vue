@@ -1,3 +1,4 @@
+<!-- eslint-disable vue/no-side-effects-in-computed-properties -->
 <script setup lang="ts">
 import ForecastModal from '@/Components/ForecastModal.vue';
 import Leafet from '@/Components/Leafet.vue';
@@ -27,7 +28,13 @@ import {
     watch,
 } from 'vue';
 import { ModelListSelect } from 'vue-search-select';
-import { CurrentWeather } from '../../types';
+import {
+    Country,
+    CurrentWeather,
+    DayWeather,
+    Location,
+    TodayForecast,
+} from '../../types';
 
 Chart.register(
     BarController,
@@ -44,15 +51,15 @@ Chart.register(
 
 const props = defineProps<{
     nearestLocation: string;
-    locations: Object[];
-    countries: string[];
+    locations: Location[];
+    countries: Country[];
     location: string;
     location_id: number;
-    weather: Object[];
+    weather: DayWeather[];
     messageType: string;
     message: string;
     currentWeather: CurrentWeather;
-    todayHourlyForecast: Object[];
+    todayHourlyForecast: TodayForecast[];
 }>();
 
 const form = useForm({
@@ -62,17 +69,18 @@ const form = useForm({
     long: 0,
 });
 
-const selectedForecast = ref(null);
+const selectedForecast = ref<DayWeather | null>(null);
 const showError = ref(false);
 const errorMessage = ref('Error! Could not get the geolocation');
-const todayHourlyForecastRef = ref(null);
+const todayHourlyForecastRef = ref<TodayForecast[] | null>(null);
 const enterKey = () => {
     form.post(route('locations.submit'), {
         preserveState: true,
         onSuccess: (response) => {
-            form.country = response.props.country;
-            form.location = response.props.location;
-            todayHourlyForecastRef.value = response.props.todayHourlyForecast;
+            form.country = response.props.country as string;
+            form.location = response.props.location as string;
+            todayHourlyForecastRef.value = response.props
+                .todayHourlyForecast as TodayForecast[];
             if (response.props.message !== undefined) {
                 showError.value = true;
                 errorMessage.value = response.props.message as string;
@@ -136,8 +144,8 @@ function searchChange() {
 
 const isMetric = ref(true);
 
-const openModal = (day) => {
-    selectedForecast.value = day;
+const openModal = (day: DayWeather | null) => {
+    if (day !== null) selectedForecast.value = day;
 };
 
 const closeModal = () => {
@@ -146,17 +154,17 @@ const closeModal = () => {
 };
 
 // Polling mechanism
-let pollingInterval = null;
+let pollingInterval = 0;
 
 const startPolling = () => {
     pollingInterval = setInterval(() => {
         form.post(route('locations.submit'), {
             preserveState: true,
             onSuccess: (response) => {
-                form.country = response.props.country;
-                form.location = response.props.location;
-                todayHourlyForecastRef.value =
-                    response.props.todayHourlyForecast;
+                form.country = response.props.country as string;
+                form.location = response.props.location as string;
+                todayHourlyForecastRef.value = response.props
+                    .todayHourlyForecast as TodayForecast[];
                 if (response.props.message !== undefined) {
                     showError.value = true;
                     errorMessage.value = response.props.message as string;
@@ -178,8 +186,9 @@ onUnmounted(() => {
     }
 });
 const canvasRef = ref<HTMLCanvasElement | null>(null);
-const chartRef = shallowRef(null);
+const chartRef = shallowRef<Chart<'line' | 'bar', any, unknown> | null>(null);
 watch(isMetric, () => {
+    console.log(todayHourlyForecastRef.value);
     if (chartRef.value && todayHourlyForecastRef.value) {
         const chart = toRaw(chartRef.value);
         Object.assign(
@@ -206,37 +215,42 @@ onMounted(() => {
 
 watch(todayHourlyForecastRef, () => {
     if (todayHourlyForecastRef.value) {
-        const lineDataset = todayHourlyForecastRef.value.map((hour) =>
-            isMetric.value ? hour.temp_c : hour.temp_f,
+        const lineDataset = todayHourlyForecastRef.value.map(
+            (hour: TodayForecast) =>
+                isMetric.value ? hour.temp_c : hour.temp_f,
         );
-        const barDataset = todayHourlyForecastRef.value.map((hour) =>
-            isMetric.value ? hour.precip_mm : hour.precip_in,
+        const barDataset = todayHourlyForecastRef.value.map(
+            (hour: TodayForecast) =>
+                isMetric.value ? hour.precip_mm : hour.precip_in,
         );
-        const labels = todayHourlyForecastRef.value.map((hour) => {
-            //Revisit this whether we need to add + '+00:00' or not
-            const date = new Date(hour.time);
-            return date.toLocaleTimeString([], {
-                hour: '2-digit',
-                minute: '2-digit',
-            });
-        });
-        chartRef.value = new Chart(canvasRef.value, {
-            data: {
-                datasets: [
-                    {
-                        type: 'bar',
-                        label: 'Percipation',
-                        data: barDataset,
-                    },
-                    {
-                        type: 'line',
-                        label: 'Temperature',
-                        data: lineDataset,
-                    },
-                ],
-                labels: labels,
+        const labels = todayHourlyForecastRef.value.map(
+            (hour: TodayForecast) => {
+                //Revisit this whether we need to add + '+00:00' or not
+                const date = new Date(hour.time);
+                return date.toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                });
             },
-        });
+        );
+        if (canvasRef.value)
+            chartRef.value = new Chart(canvasRef.value, {
+                data: {
+                    datasets: [
+                        {
+                            type: 'bar',
+                            label: 'Percipation',
+                            data: barDataset,
+                        },
+                        {
+                            type: 'line',
+                            label: 'Temperature',
+                            data: lineDataset,
+                        },
+                    ],
+                    labels: labels,
+                },
+            });
     }
 });
 </script>
@@ -260,10 +274,11 @@ watch(todayHourlyForecastRef, () => {
                                     class="flex-grow rounded-l-md border p-2 focus:outline-none focus:ring-2 focus:ring-sky-500"
                                     v-model="form.country"
                                 >
-                                    <option value="">Select a city</option>
+                                    <option value="">Select a country</option>
                                     <option
                                         v-for="country in countries"
-                                        :key="country"
+                                        :value="country.country"
+                                        :key="country.id"
                                     >
                                         {{ country }}
                                     </option>
@@ -372,7 +387,16 @@ watch(todayHourlyForecastRef, () => {
                                                     w.date,
                                                 ).toLocaleDateString() ===
                                                 new Date().toLocaleDateString(),
-                                        ),
+                                        ) ??
+                                            ({
+                                                date: '',
+                                                maxtemp_c: 0,
+                                                maxtemp_f: 0,
+                                                mintemp_c: 0,
+                                                mintemp_f: 0,
+                                                condition_icon: '',
+                                                condition_text: '',
+                                            } as DayWeather),
                                     )
                             "
                         >
@@ -433,7 +457,7 @@ watch(todayHourlyForecastRef, () => {
                                             }}
                                         </p>
                                         <p class="text-sm text-gray-600">
-                                            {{ day.conditon_text }}
+                                            {{ day.condition_text }}
                                         </p>
                                     </div>
                                 </div>

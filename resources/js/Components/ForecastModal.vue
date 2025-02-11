@@ -127,7 +127,7 @@
                 </p>
             </div>
             <p class="mb-6 text-lg text-gray-600">
-                {{ selectedForecast.conditon_text }}
+                {{ selectedForecast.condition_text }}
             </p>
             <button
                 @click="() => emit('close:modal')"
@@ -142,13 +142,14 @@
 <script setup lang="ts">
 import { Chart } from 'chart.js';
 import { onMounted, ref, shallowRef } from 'vue';
+import { DayWeather, TodayForecast } from '../types/index';
 const canvasRef = ref<HTMLCanvasElement | null>(null);
-const chartRef = shallowRef(null);
-const props = defineProps({
-    selectedForecast: Object,
-    isMetric: Boolean,
-    location_id: Number,
-});
+const chartRef = shallowRef<Chart<'line' | 'bar', any, unknown> | null>(null);
+const props = defineProps<{
+    selectedForecast: DayWeather;
+    isMetric: Boolean;
+    location_id: Number;
+}>();
 const emit = defineEmits(['close:modal']);
 onMounted(async () => {
     document.body.classList.add('overflow-hidden');
@@ -164,13 +165,13 @@ onMounted(async () => {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         const selectedHourlyForecast = await response.json();
-        const lineDataset = selectedHourlyForecast.map((hour) =>
+        const lineDataset = selectedHourlyForecast.map((hour: TodayForecast) =>
             props.isMetric ? hour.temp_c : hour.temp_f,
         );
-        const barDataset = selectedHourlyForecast.map((hour) =>
+        const barDataset = selectedHourlyForecast.map((hour: TodayForecast) =>
             props.isMetric ? hour.precip_mm : hour.precip_in,
         );
-        const labels = selectedHourlyForecast.map((hour) => {
+        const labels = selectedHourlyForecast.map((hour: TodayForecast) => {
             //Revisit this whether we need to add + '+00:00' or not
             const date = new Date(hour.time);
             return date.toLocaleTimeString([], {
@@ -178,23 +179,24 @@ onMounted(async () => {
                 minute: '2-digit',
             });
         });
-        chartRef.value = new Chart(canvasRef.value, {
-            data: {
-                datasets: [
-                    {
-                        type: 'bar',
-                        label: 'Percipation',
-                        data: barDataset,
-                    },
-                    {
-                        type: 'line',
-                        label: 'Temperature',
-                        data: lineDataset,
-                    },
-                ],
-                labels: labels,
-            },
-        });
+        if (canvasRef.value)
+            chartRef.value = new Chart(canvasRef.value, {
+                data: {
+                    datasets: [
+                        {
+                            type: 'bar',
+                            label: 'Percipation',
+                            data: barDataset,
+                        },
+                        {
+                            type: 'line',
+                            label: 'Temperature',
+                            data: lineDataset,
+                        },
+                    ],
+                    labels: labels,
+                },
+            });
     } catch (error) {
         console.error('Error fetching hourly forecasts:', error);
     }

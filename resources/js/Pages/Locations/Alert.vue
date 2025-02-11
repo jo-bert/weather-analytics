@@ -177,17 +177,36 @@
                                 errors.expiry
                             }}</span>
                         </div>
+                        <div
+                            class="flex items-center space-x-2 space-y-2"
+                            v-if="id"
+                        >
+                            <span class="text-sm font-medium text-gray-700"
+                                >Paused</span
+                            >
+                            <label class="switch">
+                                <input
+                                    type="checkbox"
+                                    v-model="paused"
+                                    v-bind="pausedProps"
+                                />
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
                     </div>
 
                     <button
                         type="submit"
                         :disabled="isSubmitting"
-                        class="w-full rounded-lg bg-green-500 bg-opacity-100 px-4 py-3 font-bold text-white"
+                        :class="{ 'bg-green-500': !id, 'bg-amber-500': id }"
+                        class="w-full rounded-lg bg-opacity-100 px-4 py-3 font-bold text-white"
                     >
                         <template v-if="isSubmitting">
                             <span class="loading loading-spinner loading-md" />
                         </template>
-                        <template v-else> Create Alert </template>
+                        <template v-else>
+                            {{ id ? 'Edit Alert' : 'Create Alert' }}
+                        </template>
                     </button>
                 </form>
 
@@ -212,8 +231,8 @@
                         </div>
                         <ul class="space-y-4">
                             <li
-                                v-for="(alert, index) in ongoingAlerts"
-                                :key="index"
+                                v-for="alert in ongoingAlerts"
+                                :key="alert.id"
                                 class="transform rounded-xl border-l-4 p-6 shadow-md transition duration-300 ease-in-out hover:-translate-y-1 hover:shadow-lg"
                                 :class="{
                                     'border-green-500': !alert.paused,
@@ -239,16 +258,16 @@
                                             }}
                                         </p>
                                         <p class="mb-1 text-gray-600">
-                                            Location: {{ alert.location }}
+                                            Location: {{ alert.full_location }}
                                         </p>
                                         <p class="mb-1 text-gray-600">
                                             Expires:
-                                            {{ formatDate(alert.expiry) }}
+                                            {{ formatDateTime(alert.expiry) }}
                                         </p>
                                         <p class="text-sm text-gray-500">
                                             Created:
                                             {{
-                                                formatDateTime(alert.createdAt)
+                                                formatDateTime(alert.created_at)
                                             }}
                                         </p>
                                     </div>
@@ -263,13 +282,13 @@
                                             Trigger
                                         </button>
                                         <button
-                                            @click="editAlert(index)"
+                                            @click="editAlert(alert.id)"
                                             class="w-full rounded-md bg-yellow-500 px-4 py-2 text-white transition duration-150 ease-in-out hover:bg-yellow-600"
                                         >
                                             Edit
                                         </button>
                                         <button
-                                            @click="deleteAlert(index)"
+                                            @click="deleteAlert(alert.id)"
                                             class="w-full rounded-md bg-red-500 px-4 py-2 text-white transition duration-150 ease-in-out hover:bg-red-600"
                                         >
                                             Delete
@@ -322,15 +341,15 @@
                                         }}
                                     </p>
                                     <p class="mb-1 text-gray-600">
-                                        Location: {{ alert.location }}
+                                        Location: {{ alert.full_location }}
                                     </p>
                                     <p class="mb-1 text-gray-600">
                                         Expired:
-                                        {{ formatDate(alert.expiry) }}
+                                        {{ formatDateTime(alert.expiry) }}
                                     </p>
                                     <p class="text-sm text-gray-500">
                                         Created:
-                                        {{ formatDateTime(alert.createdAt) }}
+                                        {{ formatDateTime(alert.created_at) }}
                                     </p>
                                 </div>
                             </li>
@@ -343,81 +362,88 @@
 </template>
 
 <script setup lang="ts">
+import { Alert, Location } from '@/types';
 import { Head } from '@inertiajs/vue3';
 import { toTypedSchema } from '@vee-validate/yup';
 import VsToast from '@vuesimple/vs-toast';
 import axios from 'axios';
 import { useForm } from 'vee-validate';
-import { computed, reactive, ref } from 'vue';
+import { computed, ref } from 'vue';
 import * as yup from 'yup';
 
 const props = defineProps<{
-    locations: Object[];
-    alert: Object[];
+    locations: Location[];
+    alerts: Alert[];
+    newAlert: Object;
 }>();
 
-console.log(props.alert);
+const { errors, defineField, handleSubmit, isSubmitting, values, setValues } =
+    useForm({
+        initialValues: {
+            id: 0,
+            parameter: '',
+            condition: '',
+            value: 0,
+            minValue: 0,
+            maxValue: 100,
+            location: '',
+            expiry: '',
+            paused: false,
+        },
+        validationSchema: toTypedSchema(
+            yup.object({
+                id: yup.number(),
+                parameter: yup.string().required(),
+                condition: yup.string().required(),
+                value: yup
+                    .number()
+                    .test('invalidAmount', `Minimum 0`, function (value = 0) {
+                        if (values.condition !== 'between' && value <= 0) {
+                            return false;
+                        }
+                        return true;
+                    }),
+                minValue: yup
+                    .number()
+                    .test('invalidAmount', `Minimum 0`, function (value = 0) {
+                        if (
+                            values.condition === 'between' &&
+                            !values.parameter?.includes('temp') &&
+                            value <= 0
+                        ) {
+                            return false;
+                        }
+                        return true;
+                    }),
+                maxValue: yup
+                    .number()
+                    .test('invalidAmount', `Minimum 0`, function (value = 0) {
+                        if (
+                            values.condition === 'between' &&
+                            !values.parameter?.includes('temp') &&
+                            value <= 0
+                        ) {
+                            return false;
+                        }
+                        return true;
+                    }),
+                location: yup.string().required(),
+                expiry: yup
+                    .string()
+                    .required()
+                    .test(
+                        'invalidDate',
+                        'Expiry Date and Time must be future',
+                        function (value) {
+                            return new Date(value) > new Date();
+                        },
+                    ),
+                paused: yup.boolean().required(),
+            }),
+        ),
+    });
 
-const { errors, defineField, handleSubmit, isSubmitting, values } = useForm({
-    initialValues: {
-        parameter: 'temp_c',
-        condition: 'between',
-        value: 0,
-        minValue: 0,
-        maxValue: 100,
-        location: '5',
-        expiry: '2025-04-11T10:26',
-    },
-    validationSchema: toTypedSchema(
-        yup.object({
-            parameter: yup.string().required(),
-            condition: yup.string().required(),
-            value: yup
-                .number()
-                .test('invalidAmount', `Minimum 0`, function (value = 0) {
-                    if (values.condition !== 'between' && value <= 0) {
-                        return false;
-                    }
-                    return true;
-                }),
-            minValue: yup
-                .number()
-                .test('invalidAmount', `Minimum 0`, function (value = 0) {
-                    if (
-                        values.condition === 'between' &&
-                        !values.parameter?.includes('temp') &&
-                        value <= 0
-                    ) {
-                        return false;
-                    }
-                    return true;
-                }),
-            maxValue: yup
-                .number()
-                .test('invalidAmount', `Minimum 0`, function (value = 0) {
-                    if (
-                        values.condition === 'between' &&
-                        !values.parameter?.includes('temp') &&
-                        value <= 0
-                    ) {
-                        return false;
-                    }
-                    return true;
-                }),
-            location: yup.string().required(),
-            expiry: yup
-                .string()
-                .required()
-                .test(
-                    'invalidDate',
-                    'Expiry Date and Time must be future',
-                    function (value) {
-                        return new Date(value) > new Date();
-                    },
-                ),
-        }),
-    ),
-});
+const [id, idProps] = defineField('id');
 const [weatherParam, weatherParamProps] = defineField('parameter');
 const [condition, conditionProps] = defineField('condition');
 const [thresholdValue, thresholdValueProps] = defineField('value');
@@ -425,8 +451,8 @@ const [minThresholdValue, minThresholdValueProps] = defineField('minValue');
 const [maxThresholdValue, maxThresholdValueProps] = defineField('maxValue');
 const [location, locationProps] = defineField('location');
 const [expiry, expiryProps] = defineField('expiry');
-
-function convertToExpiryValue(dateTimeString) {
+const [paused, pausedProps] = defineField('paused');
+function convertToExpiryValue(dateTimeString: string) {
     const date = new Date(dateTimeString);
     const timezoneOffset = date.getTimezoneOffset();
     const timezoneOffsetHours = Math.abs(timezoneOffset / 60);
@@ -444,16 +470,9 @@ function convertToExpiryValue(dateTimeString) {
 
     return expiryValue;
 }
-interface InsertAlert {
-    expiry: string;
-    location: string;
-    maxValue: number;
-    minValue: number;
-    value: number;
-    condition: string;
-    parameter: string;
-}
-async function onSuccess(values: InsertAlert) {
+
+type FormValues = typeof values;
+async function onSuccess(values: FormValues) {
     const {
         expiry,
         location,
@@ -462,43 +481,88 @@ async function onSuccess(values: InsertAlert) {
         value,
         condition,
         parameter,
+        paused,
     } = values;
-
-    axios
-        .post('/alerts', {
-            location_id: location,
-            parameter,
-            condition,
-            value,
-            minValue,
-            maxValue,
-            expiry: convertToExpiryValue(expiry),
-            paused: false,
-        })
-        .then(function (response) {
-            VsToast.show({
-                title: 'Added the alert',
-                variant: 'success',
-                position: 'top-right',
+    if (values.id) {
+        axios
+            .put('/alerts/' + values.id, {
+                location_id: location,
+                parameter,
+                condition,
+                value,
+                minValue,
+                maxValue,
+                expiry: convertToExpiryValue(expiry as string),
+                paused,
+            })
+            .then(function (response) {
+                VsToast.show({
+                    title: 'Modified the alert',
+                    variant: 'success',
+                    position: 'top-right',
+                });
+                setTimeout(() => window.location.reload(), 1000);
+            })
+            .catch(function (error) {
+                console.log(error);
+                const errors: string[] = [];
+                Object.keys(error.response.data.errors).forEach((errorKey) => {
+                    error.response.data.errors[errorKey].forEach(
+                        (message: string) => errors.push(message),
+                    );
+                });
+                VsToast.show({
+                    title: 'Failed to add alert',
+                    message: errors.length > 1 ? errors.join(', ') : errors[0],
+                    variant: 'error',
+                    position: 'top-right',
+                });
             });
-        })
-        .catch(function (error) {
-            const errors: string[] = [];
-            Object.keys(error.response.data.errors).forEach((errorKey) => {
-                error.response.data.errors[errorKey].forEach(
-                    (message: string) => errors.push(message),
-                );
+    } else
+        axios
+            .post('/alerts', {
+                location_id: location,
+                parameter,
+                condition,
+                value,
+                minValue,
+                maxValue,
+                expiry: convertToExpiryValue(expiry as string),
+                paused,
+            })
+            .then(function (response) {
+                VsToast.show({
+                    title: 'Added the alert',
+                    variant: 'success',
+                    position: 'top-right',
+                });
+                setTimeout(() => window.location.reload(), 1000);
+            })
+            .catch(function (error) {
+                const errors: string[] = [];
+                Object.keys(error.response.data.errors).forEach((errorKey) => {
+                    error.response.data.errors[errorKey].forEach(
+                        (message: string) => errors.push(message),
+                    );
+                });
+                VsToast.show({
+                    title: 'Failed to add alert',
+                    message: errors.length > 1 ? errors.join(', ') : errors[0],
+                    variant: 'error',
+                    position: 'top-right',
+                });
             });
-            VsToast.show({
-                title: 'Failed to add alert',
-                message: errors.length > 1 ? errors.join(', ') : errors[0],
-                variant: 'error',
-                position: 'top-right',
-            });
-        });
 }
 
-function onInvalidSubmit({ values, errors, results }) {
+function onInvalidSubmit({
+    values,
+    errors,
+    results,
+}: {
+    values: FormValues;
+    errors: any;
+    results: any;
+}) {
     console.log(values); // current form values
     console.error(errors); // a map of field names and their first error message
     console.log(results); // a detailed map of field names and their validation results
@@ -537,119 +601,66 @@ const weatherParameters = [
     { value: 'uv', label: 'UV Index' },
 ];
 
-const alerts = ref([
-    {
-        parameter: 'temp_c',
-        condition: 'more',
-        value: 30,
-        location: 'New York',
-        expiry: '2025-06-30',
-        createdAt: new Date('2025-01-15T10:30:00'),
-        paused: false,
-    },
-    {
-        parameter: 'wind_mph',
-        condition: 'between',
-        minValue: 10,
-        maxValue: 20,
-        location: 'London',
-        expiry: '2025-07-15',
-        createdAt: new Date('2025-01-20T14:45:00'),
-        paused: false,
-    },
-    {
-        parameter: 'humidity',
-        condition: 'less',
-        value: 40,
-        location: 'Tokyo',
-        expiry: '2025-02-28',
-        createdAt: new Date('2025-01-25T09:15:00'),
-        paused: false,
-    },
-    {
-        parameter: 'precip_mm',
-        condition: 'more',
-        value: 50,
-        location: 'Paris',
-        expiry: '2024-12-31',
-        createdAt: new Date('2024-12-15T16:20:00'),
-        paused: false,
-    },
-]);
-
-const newAlert = reactive({
-    parameter: '',
-    condition: 'equal',
-    value: 0,
-    minValue: 0,
-    maxValue: 0,
-    location: '',
-    expiry: '',
-});
-
 const pauseAllAlerts = ref(false);
 
-const createAlert = () => {
-    if (newAlert.parameter && newAlert.location && newAlert.expiry) {
-        const alertToAdd = {
-            ...newAlert,
-            createdAt: new Date(),
-            paused: false,
-        };
-        if (newAlert.condition === 'between') {
-            delete alertToAdd.value;
-        } else {
-            delete alertToAdd.minValue;
-            delete alertToAdd.maxValue;
-        }
-        alerts.value.push(alertToAdd);
-        // Reset form
-        newAlert.parameter = '';
-        newAlert.condition = 'equal';
-        newAlert.value = 0;
-        newAlert.minValue = 0;
-        newAlert.maxValue = 0;
-        newAlert.location = '';
-        newAlert.expiry = '';
-    } else {
-        alert('Please fill in all fields');
+const editAlert = (id: number) => {
+    const selectedAlert = props.alerts.find((alert) => alert.id === id);
+    if (selectedAlert) {
+        const {
+            id,
+            expiry,
+            full_location,
+            maxValue,
+            minValue,
+            value,
+            condition,
+            parameter,
+            paused,
+        } = selectedAlert;
+        setValues({
+            id,
+            expiry: expiry.slice(0, 16),
+            location: props.locations.find(
+                (location) => location.name === full_location.split(',')[0],
+            )?.id,
+            maxValue,
+            minValue,
+            value,
+            condition,
+            parameter,
+            paused,
+        });
     }
 };
 
-const editAlert = (index) => {
-    const alert = alerts.value[index];
-    newAlert.parameter = alert.parameter;
-    newAlert.condition = alert.condition;
-    if (alert.condition === 'between') {
-        newAlert.minValue = alert.minValue;
-        newAlert.maxValue = alert.maxValue;
-    } else {
-        newAlert.value = alert.value;
-    }
-    newAlert.location = alert.location;
-    newAlert.expiry = alert.expiry;
-    deleteAlert(index);
+const deleteAlert = (id: number) => {
+    axios
+        .delete(`/alerts/${id}`)
+        .then(function (response) {
+            VsToast.show({
+                title: 'Deleted the alert',
+                variant: 'success',
+                position: 'top-right',
+            });
+            setTimeout(() => window.location.reload(), 1000);
+        })
+        .catch(function (error) {
+            VsToast.show({
+                title: 'Failed to delete alert',
+                message: error.response.data.errors.join(', '),
+                variant: 'error',
+                position: 'top-right',
+            });
+        });
 };
 
-const deleteAlert = (index) => {
-    alerts.value.splice(index, 1);
-};
-
-const getParameterLabel = (paramValue) => {
+const getParameterLabel = (paramValue: string) => {
     const param = weatherParameters.find((p) => p.value === paramValue);
     return param ? param.label : paramValue;
 };
 
-const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-    });
-};
-
-const formatDateTime = (date) => {
-    return date.toLocaleString('en-US', {
+const formatDateTime = (date: string) => {
+    return new Date(date).toLocaleString('en-US', {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
@@ -660,21 +671,30 @@ const formatDateTime = (date) => {
 
 const ongoingAlerts = computed(() => {
     const now = new Date();
-    return alerts.value.filter((alert) => new Date(alert.expiry) > now);
+    return props.alerts.filter(
+        (alert) => new Date(alert.expiry) > now,
+    ) as Alert[];
 });
 
 const pastAlerts = computed(() => {
     const now = new Date();
-    return alerts.value.filter((alert) => new Date(alert.expiry) <= now);
+    return props.alerts.filter(
+        (alert) => new Date(alert.expiry) <= now,
+    ) as Alert[];
 });
 
-const triggerAlert = (alert) => {
-    console.log('Alert triggered:', alert);
-    // In a real application, you would implement the logic to handle the triggered alert
-    // For example, sending a notification or performing some action
+const triggerAlert = (alert: Alert) => {
+    VsToast.show({
+        title:
+            alert.condition === 'between'
+                ? `${alert.parameter} is ${alert.condition} ${alert.minValue}  and ${alert.maxValue}`
+                : `${alert.parameter} is ${alert.condition} than ${alert.value}`,
+        variant: 'info',
+        position: 'top-right',
+    });
 };
 
-const capitalizeFirstLetter = (string) => {
+const capitalizeFirstLetter = (string: string) => {
     return string.charAt(0).toUpperCase() + string.slice(1);
 };
 </script>

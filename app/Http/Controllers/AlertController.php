@@ -3,49 +3,55 @@
 namespace App\Http\Controllers;
 
 use App\Models\Alert;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Validator;
 use App\Models\Location;
+use Illuminate\Support\Facades\Cache;
 
 class AlertController extends Controller
 {
   //make the controller run with authenticated user and then submit and store to DB. Make sure user can retrigger it
   public function index()
   {
-    $locations = Location::select(['id', 'name', 'country'])->get();
-    $alerts = Alert::all();
+    $alerts = Alert::with(['location' => function ($query) {
+      $query->select('id', 'name', 'region', 'country');
+    }])->get()->map(function ($alert) {
+      $alert->full_location = $alert->location->name . ', ' . $alert->location->region . ', ' . $alert->location->country;
+      unset($alert->location_id);
+      unset($alert->location);
+      return $alert;
+    });
     return Inertia::render('Locations/Alert', [
-      'locations' => $locations,
-      'alert' => $alerts
+      'locations' => Cache::remember('locations', now()->addMinute(), function () {
+        return Location::select(['id', 'name', 'country'])->get();
+      }),
+      'alerts' => $alerts
     ]);
   }
 
   public function store(Request $request)
   {
-    // Validate the request data
     $validator = Validator::make($request->all(), [
-      'location_id' => 'required',
-      'parameter' => 'required|string',
       'condition' => 'required|string',
-      'value' => 'nullable|numeric',
-      'minValue' => 'nullable|numeric',
-      'maxValue' => 'nullable|numeric',
       'expiry' => 'required|date',
+      'location_id' => 'required|exists:locations,id',
+      'maxValue' => 'nullable|numeric',
+      'minValue' => 'nullable|numeric',
+      'parameter' => 'required|string',
       'paused' => 'boolean',
+      'value' => 'nullable|numeric',
     ]);
     if ($validator->fails()) {
       return response()->json(['errors' => $validator->errors()], 422);
     }
 
-    // Create a new alert
     $alert = Alert::create($request->all());
-
     if ($alert) {
-      // Return the new alert
-      return response()->json($alert, 201);
+      return response()->json(Alert::all(), 201);
     } else {
-      return response()->status(200);
+      return response()->json(Alert::all(), 400);
     }
   }
 
@@ -56,15 +62,15 @@ class AlertController extends Controller
   {
     // Validate the request data
     $validator = Validator::make($request->all(), [
-      'user_id' => 'required|exists:users,id',
-      'location_id' => 'required|exists:locations,id',
-      'parameter' => 'required|string',
       'condition' => 'required|string',
-      'value' => 'nullable|numeric',
-      'minValue' => 'nullable|numeric',
-      'maxValue' => 'nullable|numeric',
       'expiry' => 'required|date',
+      'location_id' => 'required|exists:locations,id',
+      'maxValue' => 'nullable|numeric',
+      'minValue' => 'nullable|numeric',
+      'parameter' => 'required|string',
       'paused' => 'boolean',
+      'value' => 'nullable|numeric',
+
     ]);
 
     if ($validator->fails()) {
@@ -81,16 +87,19 @@ class AlertController extends Controller
   /**
    * Remove the specified resource from storage.
    */
-  public function destroy(Request $request, $id)
+  public function destroy($id)
   {
-    // Find the alert
-    $alert = Alert::findOrFail($id);
+    try {
+      $alert = Alert::findOrFail(id: $id);
 
-    // Delete the alert
-    $alert->delete();
+      // Delete the alert
+      $alert->delete();
 
-    // Return a success message
-    return response()->json(['message' => 'Alert deleted'], 200);
+      // Return a success message
+      return response()->json(['message' => 'Alert deleted'], 200);
+    } catch (ModelNotFoundException $e) {
+      return response()->json(['errors' => ['Invalid Id']], 400);
+    }
   }
 
   /**

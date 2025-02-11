@@ -71,7 +71,7 @@ class Alert extends Model
       'uv'
     ];
 
-    $validConditions = ['below', 'above', 'between'];
+    $validConditions = ['less', 'more', 'between', 'equal'];
 
     if (!in_array($model->parameter, $validParameters)) {
       throw ValidationException::withMessages(['parameter' => 'Invalid parameter value.']);
