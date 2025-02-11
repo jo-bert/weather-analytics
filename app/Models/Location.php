@@ -12,4 +12,9 @@ class Location extends Model
     {
         return $this->hasMany(HourlyForecast::class);
     }
+
+    public function alert()
+    {
+        return $this->hasMany(Alert::class);
+    }
 }

@@ -3,10 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\HourlyForecast;
-use Carbon\Carbon;
 use Exception;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 
 class HourlyController extends Controller
 {

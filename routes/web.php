@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AlertController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\HourlyController;
 use App\Http\Controllers\ProfileController;
@@ -29,6 +30,7 @@ Route::middleware('auth')->group(function () {
 Route::prefix('location')->group(function () {
     Route::get('/', [LocationController::class, 'index'])->name('locations.index');
     Route::post('/', [LocationController::class, 'submit'])->name('locations.submit');
+    Route::get('/alert', [AlertController::class, 'index'])->name('alert.index');
 });
 
 Route::get('/hourly-forecasts/range', [HourlyController::class, 'getByRange']);
@@ -37,4 +39,10 @@ Route::post('/hourly-forecasts', [HourlyController::class, 'store'])->middleware
 Route::get('/hourly-forecasts/{id}', [HourlyController::class, 'show']);
 Route::put('/hourly-forecasts/{id}', [HourlyController::class, 'update'])->middleware(['auth', 'verified']);
 Route::delete('/hourly-forecasts/{id}', [HourlyController::class, 'destroy'])->middleware(['auth', 'verified']);
+
+Route::resource('alerts', AlertController::class);
+
+Route::put('/alerts/{id}/pause', [AlertController::class, 'pause'])->name('alerts.pause');
+Route::put('/alerts/{id}/resume', [AlertController::class, 'resume'])->name('alerts.resume');
+Route::delete('/alerts/{id}', [AlertController::class, 'destroy'])->name('alerts.destroy');
 require __DIR__ . '/auth.php';
