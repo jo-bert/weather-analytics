@@ -32,7 +32,6 @@ import {
 } from 'vue';
 import { ModelListSelect } from 'vue-search-select';
 import {
-    Country,
     CurrentWeather,
     DayWeather,
     Location,
@@ -55,7 +54,7 @@ Chart.register(
 const props = defineProps<{
     nearestLocation: string;
     locations: Location[];
-    countries: Country[];
+    countries: string[];
     location: string;
     location_id: number;
     weather: DayWeather[];

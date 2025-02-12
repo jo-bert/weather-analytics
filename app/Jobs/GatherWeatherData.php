@@ -63,35 +63,31 @@ class GatherWeatherData implements ShouldQueue
             }
         }
 
-        for ($k = 1; $k <= 10; $k++) {
-            $date = now()->addDays($k)->format('Y-m-d');
-            $attempts = 0;
-            do {
-                $response = Http::get("http://api.weatherapi.com/v1/forecast.json?key={$weatherApiKey}&q={$this->city}&days={$k}&aqi=no&alerts=no");
-                $attempts++;
-            } while (!$response->ok() && $attempts < $this->maxAttempts);
-            if ($response->ok()) {
-                $jsonResponse = $response->json();
-                $locationData = $jsonResponse['location'];
-                $storedLocation = Location::where('name', $locationData['name']);
-                if ($storedLocation->exists()) {
-                    $this->hourlyForecastRepository->save($jsonResponse, $storedLocation->first());
-                } else {
-                    $location = Location::create([
-                        'name' => $locationData['name'],
-                        'region' => $locationData['region'],
-                        'country' => $locationData['country'],
-                        'lat' => $locationData['lat'],
-                        'lon' => $locationData['lon'],
-                        'tz_id' => $locationData['tz_id'],
-                    ]);
-                    Log::info("Location created: {$locationData['name']}");
-                    $this->hourlyForecastRepository->save($jsonResponse, $location);
-                }
+        $attempts = 0;
+        do {
+            $response = Http::get("http://api.weatherapi.com/v1/forecast.json?key={$weatherApiKey}&q={$this->city}&days=10&aqi=no&alerts=no");
+            $attempts++;
+        } while (!$response->ok() && $attempts < $this->maxAttempts);
+        if ($response->ok()) {
+            $jsonResponse = $response->json();
+            $locationData = $jsonResponse['location'];
+            $storedLocation = Location::where('name', $locationData['name']);
+            if ($storedLocation->exists()) {
+                $this->hourlyForecastRepository->save($jsonResponse, $storedLocation->first());
             } else {
-                Log::info("Error code found when trying to query {$date} for forecast {$this->city}");
-                Log::error($response->body());
+                $location = Location::create([
+                    'name' => $locationData['name'],
+                    'region' => $locationData['region'],
+                    'country' => $locationData['country'],
+                    'lat' => $locationData['lat'],
+                    'lon' => $locationData['lon'],
+                    'tz_id' => $locationData['tz_id'],
+                ]);
+                Log::info("Location created: {$locationData['name']}");
+                $this->hourlyForecastRepository->save($jsonResponse, $location);
             }
+        } else {
+            Log::error($response->body());
         }
     }
 }
