@@ -216,18 +216,6 @@
                             <h2 class="text-3xl font-bold text-blue-800">
                                 Ongoing Alerts
                             </h2>
-                            <div class="flex items-center space-x-2">
-                                <span class="text-sm font-medium text-gray-700"
-                                    >Pause all alerts</span
-                                >
-                                <label class="switch">
-                                    <input
-                                        type="checkbox"
-                                        v-model="pauseAllAlerts"
-                                    />
-                                    <span class="slider round"></span>
-                                </label>
-                            </div>
                         </div>
                         <ul class="space-y-4">
                             <li
@@ -275,9 +263,7 @@
                                         <button
                                             @click="triggerAlert(alert)"
                                             class="w-full rounded-md bg-green-500 px-4 py-2 text-white transition duration-150 ease-in-out hover:bg-green-600"
-                                            :disabled="
-                                                alert.paused || pauseAllAlerts
-                                            "
+                                            :disabled="alert.paused"
                                         >
                                             Trigger
                                         </button>
@@ -304,7 +290,12 @@
                                                 <input
                                                     type="checkbox"
                                                     v-model="alert.paused"
-                                                    :disabled="pauseAllAlerts"
+                                                    @click="
+                                                        togglePause(
+                                                            alert.id,
+                                                            alert.paused,
+                                                        )
+                                                    "
                                                 />
                                                 <span
                                                     class="slider round"
@@ -368,7 +359,7 @@ import { toTypedSchema } from '@vee-validate/yup';
 import VsToast from '@vuesimple/vs-toast';
 import axios from 'axios';
 import { useForm } from 'vee-validate';
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 import * as yup from 'yup';
 
 const props = defineProps<{
@@ -601,8 +592,6 @@ const weatherParameters = [
     { value: 'uv', label: 'UV Index' },
 ];
 
-const pauseAllAlerts = ref(false);
-
 const editAlert = (id: number) => {
     const selectedAlert = props.alerts.find((alert) => alert.id === id);
     if (selectedAlert) {
@@ -647,6 +636,27 @@ const deleteAlert = (id: number) => {
         .catch(function (error) {
             VsToast.show({
                 title: 'Failed to delete alert',
+                message: error.response.data.errors.join(', '),
+                variant: 'error',
+                position: 'top-right',
+            });
+        });
+};
+
+const togglePause = (id: number, pause: boolean) => {
+    axios
+        .put(pause ? `/alerts/${id}/resume` : `/alerts/${id}/pause`)
+        .then(function (response) {
+            VsToast.show({
+                title: 'Updated the alert',
+                variant: 'success',
+                position: 'top-right',
+            });
+            setTimeout(() => window.location.reload(), 1000);
+        })
+        .catch(function (error) {
+            VsToast.show({
+                title: 'Failed to update alert',
                 message: error.response.data.errors.join(', '),
                 variant: 'error',
                 position: 'top-right',

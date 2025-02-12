@@ -17,10 +17,13 @@ class GatherWeatherData implements ShouldQueue
 {
     use InteractsWithQueue, Queueable, SerializesModels;
 
+
+    private $maxAttempts;
     protected $city;
     private HourlyForecastRepository $hourlyForecastRepository;
     public function __construct($city)
     {
+        $this->maxAttempts = 3;
         $this->city = $city;
         $this->hourlyForecastRepository = new HourlyForecastRepository();
     }
@@ -31,7 +34,11 @@ class GatherWeatherData implements ShouldQueue
         $weatherApiKey = env('WEATHER_API_KEY', '');
         for ($j = -7; $j <= 2; $j++) {
             $date = now()->addDays($j)->format('Y-m-d');
-            $response = Http::get("http://api.weatherapi.com/v1/history.json?key={$weatherApiKey}&q={$this->city}&dt={$date}");
+            $attempts = 0;
+            do {
+                $response = Http::get("http://api.weatherapi.com/v1/history.json?key={$weatherApiKey}&q={$this->city}&dt={$date}");
+                $attempts++;
+            } while (!$response->ok() && $attempts < $this->maxAttempts);
             if ($response->ok()) {
                 $jsonResponse = $response->json();
                 $locationData = $jsonResponse['location'];
@@ -58,7 +65,11 @@ class GatherWeatherData implements ShouldQueue
 
         for ($k = 1; $k <= 10; $k++) {
             $date = now()->addDays($k)->format('Y-m-d');
-            $response = Http::get("http://api.weatherapi.com/v1/forecast.json?key={$weatherApiKey}&q={$this->city}&days={$k}&aqi=no&alerts=no");
+            $attempts = 0;
+            do {
+                $response = Http::get("http://api.weatherapi.com/v1/forecast.json?key={$weatherApiKey}&q={$this->city}&days={$k}&aqi=no&alerts=no");
+                $attempts++;
+            } while (!$response->ok() && $attempts < $this->maxAttempts);
             if ($response->ok()) {
                 $jsonResponse = $response->json();
                 $locationData = $jsonResponse['location'];

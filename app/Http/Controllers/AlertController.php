@@ -17,7 +17,7 @@ class AlertController extends Controller
   {
     $alerts = Alert::with(['location' => function ($query) {
       $query->select('id', 'name', 'region', 'country');
-    }])->get()->map(function ($alert) {
+    }])->orderBy('id')->get()->map(function ($alert) {
       $alert->full_location = $alert->location->name . ', ' . $alert->location->region . ', ' . $alert->location->country;
       unset($alert->location_id);
       unset($alert->location);

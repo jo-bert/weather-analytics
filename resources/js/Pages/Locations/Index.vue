@@ -1,7 +1,10 @@
 <!-- eslint-disable vue/no-side-effects-in-computed-properties -->
 <script setup lang="ts">
 import ForecastModal from '@/Components/ForecastModal.vue';
+import InputLabel from '@/Components/InputLabel.vue';
 import Leafet from '@/Components/Leafet.vue';
+import TextInput from '@/Components/TextInput.vue';
+import Toggle from '@/Components/Toggle.vue';
 import { Head, useForm } from '@inertiajs/vue3';
 import {
     BarController,
@@ -143,6 +146,7 @@ function searchChange() {
 }
 
 const isMetric = ref(true);
+const isCustomCity = ref(false);
 
 const openModal = (day: DayWeather | null) => {
     if (day !== null) selectedForecast.value = day;
@@ -188,7 +192,6 @@ onUnmounted(() => {
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 const chartRef = shallowRef<Chart<'line' | 'bar', any, unknown> | null>(null);
 watch(isMetric, () => {
-    console.log(todayHourlyForecastRef.value);
     if (chartRef.value && todayHourlyForecastRef.value) {
         const chart = toRaw(chartRef.value);
         Object.assign(
@@ -269,31 +272,44 @@ watch(todayHourlyForecastRef, () => {
                     <!-- Location Input -->
                     <div class="rounded-lg bg-white p-6 shadow-lg">
                         <form @submit.prevent="enterKey">
-                            <div class="mb-4 flex items-center">
-                                <select
-                                    class="flex-grow rounded-l-md border p-2 focus:outline-none focus:ring-2 focus:ring-sky-500"
-                                    v-model="form.country"
-                                >
-                                    <option value="">Select a country</option>
-                                    <option
-                                        v-for="country in countries"
-                                        :value="country.country"
-                                        :key="country.id"
+                            <Toggle
+                                v-model="isCustomCity"
+                                offText="Old City"
+                                onText="New City"
+                            />
+                            <div v-if="!isCustomCity">
+                                <div class="mb-4 flex items-center">
+                                    <select
+                                        class="flex-grow rounded-l-md border p-2 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                                        v-model="form.country"
                                     >
-                                        {{ country }}
-                                    </option>
-                                </select>
+                                        <option value="">
+                                            Select a country
+                                        </option>
+                                        <option
+                                            v-for="country in countries"
+                                            :value="country.country"
+                                            :key="country.id"
+                                        >
+                                            {{ country }}
+                                        </option>
+                                    </select>
+                                </div>
+                                <div class="mb-4 flex items-center">
+                                    <ModelListSelect
+                                        :list="filteredLocation"
+                                        optionValue="name"
+                                        optionText="name"
+                                        id="id"
+                                        v-model="form.location"
+                                        placeholder="Select a City"
+                                        @searchchange="searchChange"
+                                    />
+                                </div>
                             </div>
-                            <div class="mb-4 flex items-center">
-                                <ModelListSelect
-                                    :list="filteredLocation"
-                                    optionValue="name"
-                                    optionText="name"
-                                    id="id"
-                                    v-model="form.location"
-                                    placeholder="Select City"
-                                    @searchchange="searchChange"
-                                />
+                            <div v-else class="mb-4 w-full">
+                                <InputLabel value="Insert a Custom City" />
+                                <TextInput v-model="form.location" />
                             </div>
                             <button
                                 :disabled="form.processing"
@@ -319,30 +335,11 @@ watch(todayHourlyForecastRef, () => {
                             {{ form.progress.percentage }}%
                         </progress>
 
-                        <div class="mb-4 flex justify-end">
-                            <label
-                                class="inline-flex cursor-pointer items-center"
-                            >
-                                <span
-                                    class="mr-3 text-sm font-medium text-gray-900"
-                                    >Imperial</span
-                                >
-                                <div class="relative">
-                                    <input
-                                        type="checkbox"
-                                        v-model="isMetric"
-                                        class="peer sr-only"
-                                    />
-                                    <div
-                                        class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-blue-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300"
-                                    ></div>
-                                </div>
-                                <span
-                                    class="ml-3 text-sm font-medium text-gray-900"
-                                    >Metric</span
-                                >
-                            </label>
-                        </div>
+                        <Toggle
+                            v-model="isMetric"
+                            offText="Imperial"
+                            onText="Metric"
+                        />
                     </div>
 
                     <!-- Current Weather -->

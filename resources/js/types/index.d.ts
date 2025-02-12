@@ -1,11 +1,5 @@
 import { Config } from 'ziggy-js';
-
-export interface User {
-    id: number;
-    name: string;
-    email: string;
-    email_verified_at?: string;
-}
+declare module '@vuesimple/vs-toast';
 
 export type PageProps<
     T extends Record<string, unknown> = Record<string, unknown>,
@@ -133,5 +127,3 @@ export interface TodayForecast {
     precip_mm: number;
     precip_in: number;
 }
-
-declare module '@vuesimple/vs-toast';
