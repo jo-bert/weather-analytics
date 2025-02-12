@@ -35,7 +35,7 @@
             </div>
 
             <div @click.stop>
-                <canvas ref="canvasRef"></canvas>
+                <canvas ref="forecastCanvasRef"></canvas>
             </div>
 
             <div class="grid grid-cols-2 gap-4">
@@ -143,7 +143,7 @@
 import { Chart } from 'chart.js';
 import { onMounted, ref, shallowRef } from 'vue';
 import { DayWeather, TodayForecast } from '../types/index';
-const canvasRef = ref<HTMLCanvasElement | null>(null);
+const forecastCanvasRef = ref<HTMLCanvasElement | null>(null);
 const chartRef = shallowRef<Chart<'line' | 'bar', any, unknown> | null>(null);
 const props = defineProps<{
     selectedForecast: DayWeather;
@@ -179,8 +179,8 @@ onMounted(async () => {
                 minute: '2-digit',
             });
         });
-        if (canvasRef.value)
-            chartRef.value = new Chart(canvasRef.value, {
+        if (forecastCanvasRef.value)
+            chartRef.value = new Chart(forecastCanvasRef.value, {
                 data: {
                     datasets: [
                         {

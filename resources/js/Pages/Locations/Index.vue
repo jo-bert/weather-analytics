@@ -77,6 +77,7 @@ const showError = ref(false);
 const errorMessage = ref('Error! Could not get the geolocation');
 const todayHourlyForecastRef = ref<TodayForecast[] | null>(null);
 const enterKey = () => {
+    if (chartRef.value) chartRef.value.destroy();
     form.post(route('locations.submit'), {
         preserveState: true,
         onSuccess: (response) => {
@@ -288,8 +289,8 @@ watch(todayHourlyForecastRef, () => {
                                         </option>
                                         <option
                                             v-for="country in countries"
-                                            :value="country.country"
-                                            :key="country.id"
+                                            :value="country"
+                                            :key="country"
                                         >
                                             {{ country }}
                                         </option>
@@ -308,7 +309,9 @@ watch(todayHourlyForecastRef, () => {
                                 </div>
                             </div>
                             <div v-else class="mb-4 w-full">
-                                <InputLabel value="Insert a Custom City" />
+                                <InputLabel
+                                    value="Insert a City/Region/Country"
+                                />
                                 <TextInput v-model="form.location" />
                             </div>
                             <button
