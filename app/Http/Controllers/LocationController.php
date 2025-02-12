@@ -101,7 +101,7 @@ class LocationController extends Controller
                     'weather' => $weather,
                     'currentWeather' => $currentWeatherResponse->ok() ? $currentWeatherResponse->json() : null,
                     'todayHourlyForecast' => HourlyForecast::where('location_id', $this->nearestLocation->id)
-                        ->whereBetween('time_epoch', [Carbon::now()->timestamp, Carbon::now()->addDays(value: 7)->timestamp])->select(['time', 'temp_c', 'temp_f', 'precip_mm', 'precip_in'])->orderBy('time_epoch')->get()
+                        ->whereBetween('time_epoch', [Carbon::now()->timestamp, Carbon::now()->addHours(24)->timestamp])->select(['time', 'temp_c', 'temp_f', 'precip_mm', 'precip_in'])->orderBy('time_epoch')->get()
                 ]);
             } else {
                 // HourlyForecast::where('location_id', $this->nearestLocation->id)
@@ -128,7 +128,7 @@ class LocationController extends Controller
                     'weather' => $weatherData->toArray(),
                     'currentWeather' => $currentWeatherResponse->ok() ? $currentWeatherResponse->json() : null,
                     'todayHourlyForecast' => HourlyForecast::where('location_id', $this->nearestLocation->id)
-                        ->whereBetween('time_epoch', [Carbon::now()->timestamp, Carbon::now()->addDays(value: 7)->timestamp])->select(['time', 'temp_c', 'temp_f', 'precip_mm', 'precip_in'])->orderBy('time_epoch')->get()
+                        ->whereBetween('time_epoch', [Carbon::now()->timestamp, Carbon::now()->addHours(24)->timestamp])->select(['time', 'temp_c', 'temp_f', 'precip_mm', 'precip_in'])->orderBy('time_epoch')->get()
                 ]);
             }
         } else {
@@ -157,7 +157,7 @@ class LocationController extends Controller
                 'weather' => $this->getDailyForecast($this->nearestLocation->name),
                 'currentWeather' => $currentWeatherResponse->ok() ? $currentWeatherResponse->json() : null,
                 'todayHourlyForecast' => HourlyForecast::where('location_id', $this->nearestLocation->id)
-                    ->whereBetween('time_epoch', [Carbon::now()->timestamp, Carbon::now()->addDays(value: 7)->timestamp])->select(['time', 'temp_c', 'temp_f', 'precip_mm', 'precip_in'])->orderBy('time_epoch')->get()
+                    ->whereBetween('time_epoch', [Carbon::now()->timestamp, Carbon::now()->addHours(24)->timestamp])->select(['time', 'temp_c', 'temp_f', 'precip_mm', 'precip_in'])->orderBy('time_epoch')->get()
             ]);
         }
     }
