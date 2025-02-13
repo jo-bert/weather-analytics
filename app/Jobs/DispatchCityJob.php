@@ -16,7 +16,7 @@ class DispatchCityJob implements ShouldQueue
 
     public function handle(): void
     {
-        $cities = ['Singapore', 'Jakarta', 'Kuala Lumpur', 'Penang', 'Kuching', 'Bangkok', 'Manila', 'Hanoi', 'Phnom Penh', 'Vientiane'];
+        $cities = ['Singapore', 'Jakarta', 'Kuala Lumpur', 'Penang', 'Kuching', 'Bangkok', 'Manila', 'Hanoi', 'Phnom Penh', 'Vientiane', 'Tokyo'];
 
         foreach ($cities as $city) {
             GatherWeatherData::dispatch($city);
