@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Jobs\GatherWeatherData;
+use App\Models\Alert;
 use App\Models\HourlyForecast;
 use App\Models\Location;
 use Carbon\Carbon;
@@ -31,10 +32,10 @@ class LocationController extends Controller
     {
         return Inertia::render('Locations/Index', [
             'nearestLocation' => null,
-            'locations' => Cache::remember('locations', now()->addMinute(), function () {
+            'locations' => Cache::remember('locations', now()->addHour(), function () {
                 return Location::select(['id', 'name', 'country'])->get();
             }),
-            'countries' => Cache::remember('countries', now()->addMinute(), function () {
+            'countries' => Cache::remember('countries', now()->addHour(), function () {
                 return Location::all()->pluck('country')->unique()->values()->toArray();
             }),
             'message' => '',
@@ -46,7 +47,7 @@ class LocationController extends Controller
     {
         $lat = $request['lat'];
         $long = $request['long'];
-        $location =  $request['location'];
+        $location = $request['location'];
         if ($lat !== 0 || $long !== 0) {
             $nearestLocationArray = FacadesDB::select('SELECT * FROM find_nearest_location(?, ?)', [$lat, $long]);
             $this->nearestLocation = !empty($nearestLocationArray) ? Location::find($nearestLocationArray[0]->id) : null;
@@ -55,10 +56,10 @@ class LocationController extends Controller
         } else {
             return Inertia::render('Locations/Index', [
                 'nearestLocation' => null,
-                'locations' => Cache::remember('locations', now()->addMinute(), function () {
+                'locations' => Cache::remember('locations', now()->addHour(), function () {
                     return Location::select(['id', 'name', 'country'])->get();
                 }),
-                'countries' => Cache::remember('countries', now()->addMinute(), function () {
+                'countries' => Cache::remember('countries', now()->addHour(), function () {
                     return Location::all()->pluck('country')->unique()->values()->toArray();
                 }),
                 'country' => '',
@@ -76,6 +77,41 @@ class LocationController extends Controller
             $attempts++;
         } while (!$currentWeatherResponse->ok() && $attempts < $this->maxAttempts);
 
+        $filteredAlerts = Alert::where('location_id', $this->nearestLocation->id)
+            ->where('triggered', false)
+            ->where('paused', false)
+            ->where('expiry', '>', now())
+            ->select([
+                'id',
+                'parameter',
+                'condition',
+                'value',
+                'minValue',
+                'maxValue',
+                'triggered',
+                'triggered_at'
+            ])
+            ->get();
+
+        $triggeredAlert = $filteredAlerts->filter(function ($alert) use ($currentWeatherResponse) {
+            if ($alert->condition === 'less') {
+                return $currentWeatherResponse['current'][$alert->parameter] < $alert->value;
+            } else if ($alert->condition === 'more') {
+                return $currentWeatherResponse['current'][$alert->parameter] > $alert->value;
+            } else if ($alert->condition === 'equal') {
+                return $currentWeatherResponse['current'][$alert->parameter] == $alert->value;
+            } else if ($alert->condition === 'between') {
+                return $currentWeatherResponse['current'][$alert->parameter] >= $alert->minValue &&  $currentWeatherResponse['current'][$alert->parameter] <= $alert->maxValue;
+            }
+        });
+        if ($triggeredAlert->count() > 0) {
+            $triggeredAlert->each(function ($alert) {
+                $dbAlert = Alert::find($alert->id);
+                $dbAlert->triggered = true;
+                $dbAlert->triggered_at = now();
+                $dbAlert->save();
+            });
+        }
 
         if (($lat && $long && $this->nearestLocation->distance <= 50) || ($location && $this->nearestLocation)) {
             $latestForecast = HourlyForecast::where('location_id', $this->nearestLocation->id)->orderBy('time_epoch', 'desc')->first();
@@ -84,15 +120,16 @@ class LocationController extends Controller
             if ($latestUpdatedTime->diffInHours($currentTime) >= 1) {
                 // Log::info("Hourly forecast for {$this->nearestLocation->name} is outdated. Updating one now and getting from the API instead");
                 GatherWeatherData::dispatch($this->nearestLocation->name);
-                $weather =  $this->getDailyForecast($this->nearestLocation->name);
+                $weather = $this->getDailyForecast($this->nearestLocation->name);
                 return Inertia::render('Locations/Index', [
                     'messageType' => 'warning',
                     'message' => 'Data is from a third-party source and may vary slightly',
+                    'triggeredAlerts' => $triggeredAlert->toArray(),
                     'nearestLocation' => $this->nearestLocation->name,
-                    'locations' => Cache::remember('locations', now()->addMinute(), function () {
+                    'locations' => Cache::remember('locations', now()->addHour(), function () {
                         return Location::select(['id', 'name', 'country'])->get();
                     }),
-                    'countries' => Cache::remember('countries', now()->addMinute(), function () {
+                    'countries' => Cache::remember('countries', now()->addHour(), function () {
                         return Location::all()->pluck('country')->unique()->values()->toArray();
                     }),
                     'country' => $this->nearestLocation->country,
@@ -115,11 +152,12 @@ class LocationController extends Controller
                     $weatherData = $weatherData->merge(json_decode(json_encode($weather)));
                 }
                 return Inertia::render('Locations/Index', [
+                    'triggeredAlerts' => $triggeredAlert->toArray(),
                     'nearestLocation' => $this->nearestLocation->name,
-                    'locations' => Cache::remember('locations', now()->addMinute(), function () {
+                    'locations' => Cache::remember('locations', now()->addHour(), function () {
                         return Location::select(['id', 'name', 'country'])->get();
                     }),
-                    'countries' => Cache::remember('countries', now()->addMinute(), function () {
+                    'countries' => Cache::remember('countries', now()->addHour(), function () {
                         return Location::all()->pluck(value: 'country')->unique()->values()->toArray();
                     }),
                     'country' => $this->nearestLocation->country,
@@ -145,10 +183,10 @@ class LocationController extends Controller
             return Inertia::render('Locations/Index', [
                 'messageType' => 'warning',
                 'message' => 'Data is from a third-party source and may vary slightly',
-                'locations' => Cache::remember('locations', now()->addMinute(), function () {
+                'locations' => Cache::remember('locations', now()->addHour(), function () {
                     return Location::select(['id', 'name', 'country'])->get();
                 }),
-                'countries' => Cache::remember('countries', now()->addMinute(), function () {
+                'countries' => Cache::remember('countries', now()->addHour(), function () {
                     return Location::all()->pluck('country')->unique()->values()->toArray();
                 }),
                 'country' => $response->json()[0]['country'],
@@ -195,7 +233,6 @@ class LocationController extends Controller
             Log::error("Failed to fetch forecast data after {$this->maxAttempts} attempts.");
             return $aggregratedData;
         }
-        Log::info($response);
         foreach ($response['forecast']['forecastday'] as $forecastDay) {
             if ($forecastDay['date'] === Carbon::now()->format('Y-m-d')) {
                 continue;

@@ -5,14 +5,17 @@ namespace App\Http\Controllers;
 use App\Models\HourlyForecast;
 use Exception;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 class HourlyController extends Controller
 {
   // GET: Retrieve all hourly forecasts
   public function index(Request $request)
   {
-    $forecasts = HourlyForecast::all();
-    return response()->json($forecasts);
+    return Cache::remember('hourly_forecasts', now()->addHour(), function () {
+      return HourlyForecast::all();
+    });
   }
 
   // POST: Create a new hourly forecast

@@ -211,6 +211,12 @@
                 </form>
 
                 <div class="space-y-10">
+                    <button
+                        @click="() => router.visit('/')"
+                        class="flex w-1/4 items-center justify-center rounded-md bg-blue-500 p-2 text-white"
+                    >
+                        Go to Dashboard
+                    </button>
                     <div>
                         <div class="mb-6 flex items-center justify-between">
                             <h2 class="text-3xl font-bold text-blue-800">
@@ -265,7 +271,7 @@
                                             class="w-full rounded-md bg-green-500 px-4 py-2 text-white transition duration-150 ease-in-out hover:bg-green-600"
                                             :disabled="alert.paused"
                                         >
-                                            Trigger
+                                            Test
                                         </button>
                                         <button
                                             @click="editAlert(alert.id)"
@@ -334,6 +340,13 @@
                                     <p class="mb-1 text-gray-600">
                                         Location: {{ alert.full_location }}
                                     </p>
+                                    <p
+                                        class="mb-1 text-gray-500"
+                                        v-if="alert.triggered"
+                                    >
+                                        Triggered:
+                                        {{ formatDateTime(alert.triggered_at) }}
+                                    </p>
                                     <p class="mb-1 text-gray-600">
                                         Expired:
                                         {{ formatDateTime(alert.expiry) }}
@@ -354,7 +367,7 @@
 
 <script setup lang="ts">
 import { Alert, Location } from '@/types';
-import { Head } from '@inertiajs/vue3';
+import { Head, router } from '@inertiajs/vue3';
 import { toTypedSchema } from '@vee-validate/yup';
 import VsToast from '@vuesimple/vs-toast';
 import axios from 'axios';
@@ -405,7 +418,20 @@ const { errors, defineField, handleSubmit, isSubmitting, values, setValues } =
                             return false;
                         }
                         return true;
-                    }),
+                    })
+                    .test(
+                        'sameAmount',
+                        `Min Value should not be same as Max Value`,
+                        function (value = 0) {
+                            if (
+                                values.condition === 'between' &&
+                                value === values.maxValue
+                            ) {
+                                return false;
+                            }
+                            return true;
+                        },
+                    ),
                 maxValue: yup
                     .number()
                     .test('invalidAmount', `Minimum 0`, function (value = 0) {
@@ -417,7 +443,20 @@ const { errors, defineField, handleSubmit, isSubmitting, values, setValues } =
                             return false;
                         }
                         return true;
-                    }),
+                    })
+                    .test(
+                        'sameAmount',
+                        `Max Value should not be same as Min Value`,
+                        function (value = 0) {
+                            if (
+                                values.condition === 'between' &&
+                                value === values.minValue
+                            ) {
+                                return false;
+                            }
+                            return true;
+                        },
+                    ),
                 location: yup.string().required(),
                 expiry: yup
                     .string()
@@ -689,7 +728,7 @@ const ongoingAlerts = computed(() => {
 const pastAlerts = computed(() => {
     const now = new Date();
     return props.alerts.filter(
-        (alert) => new Date(alert.expiry) <= now,
+        (alert) => new Date(alert.expiry) <= now || alert.triggered,
     ) as Alert[];
 });
 

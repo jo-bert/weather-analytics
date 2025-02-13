@@ -5,15 +5,15 @@ use App\Http\Controllers\LocationController;
 use App\Http\Controllers\HourlyController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/locations', [LocationController::class, 'index'])->name('locations.index');
-Route::post('/locations', [LocationController::class, 'submit'])->name('locations.submit');
+Route::get('/', [LocationController::class, 'index'])->name('locations.index');
+Route::post('/', [LocationController::class, 'submit'])->name('locations.submit');
 
 Route::get('/hourly-forecasts/range', [HourlyController::class, 'getByRange']);
 Route::get('/hourly-forecasts', [HourlyController::class, 'index']);
-Route::post('/hourly-forecasts', [HourlyController::class, 'store'])->middleware(['auth', 'verified']);
+Route::post('/hourly-forecasts', [HourlyController::class, 'store']);
 Route::get('/hourly-forecasts/{id}', [HourlyController::class, 'show']);
-Route::put('/hourly-forecasts/{id}', [HourlyController::class, 'update'])->middleware(['auth', 'verified']);
-Route::delete('/hourly-forecasts/{id}', [HourlyController::class, 'destroy'])->middleware(['auth', 'verified']);
+Route::put('/hourly-forecasts/{id}', [HourlyController::class, 'update']);
+Route::delete('/hourly-forecasts/{id}', [HourlyController::class, 'destroy']);
 
 Route::resource('alerts', AlertController::class);
 

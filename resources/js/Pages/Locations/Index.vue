@@ -5,7 +5,8 @@ import InputLabel from '@/Components/InputLabel.vue';
 import Leafet from '@/Components/Leafet.vue';
 import TextInput from '@/Components/TextInput.vue';
 import Toggle from '@/Components/Toggle.vue';
-import { Head, useForm } from '@inertiajs/vue3';
+import { Head, router, useForm } from '@inertiajs/vue3';
+import VsToast from '@vuesimple/vs-toast';
 import {
     BarController,
     BarElement,
@@ -32,6 +33,7 @@ import {
 } from 'vue';
 import { ModelListSelect } from 'vue-search-select';
 import {
+    Alert,
     CurrentWeather,
     DayWeather,
     Location,
@@ -62,6 +64,7 @@ const props = defineProps<{
     message: string;
     currentWeather: CurrentWeather;
     todayHourlyForecast: TodayForecast[];
+    triggeredAlerts: Alert[];
 }>();
 
 const form = useForm({
@@ -84,6 +87,19 @@ const enterKey = () => {
             form.location = response.props.location as string;
             todayHourlyForecastRef.value = response.props
                 .todayHourlyForecast as TodayForecast[];
+
+            (response.props.triggeredAlerts as Alert[]).forEach((alert) => {
+                setTimeout(() => {
+                    VsToast.show({
+                        title:
+                            alert.condition === 'between'
+                                ? `${alert.parameter} is ${alert.condition} ${alert.minValue}  and ${alert.maxValue}`
+                                : `${alert.parameter} is ${alert.condition} than ${alert.value}`,
+                        variant: 'info',
+                        position: 'top-right',
+                    });
+                }, 5000);
+            });
             if (response.props.message !== undefined) {
                 showError.value = true;
                 errorMessage.value = response.props.message as string;
@@ -145,7 +161,7 @@ function searchChange() {
     form.long = 0;
 }
 
-const isMetric = ref(true);
+const isMetric = ref(false);
 const isCustomCity = ref(false);
 
 const openModal = (day: DayWeather | null) => {
@@ -269,7 +285,6 @@ watch(todayHourlyForecastRef, () => {
             <div class="grid grid-cols-1 gap-8 lg:grid-cols-3">
                 <!-- Left Column: Location Input and Current Weather -->
                 <div class="space-y-6 lg:col-span-1">
-                    <!-- Location Input -->
                     <div class="rounded-lg bg-white p-6 shadow-lg">
                         <form @submit.prevent="enterKey">
                             <Toggle
@@ -329,19 +344,19 @@ watch(todayHourlyForecastRef, () => {
                             <MapPinIcon class="mr-2 h-5 w-5" />
                             Use Current Location
                         </button>
-                        <progress
-                            v-if="form.progress"
-                            :value="form.progress.percentage"
-                            max="100"
-                        >
-                            {{ form.progress.percentage }}%
-                        </progress>
 
                         <Toggle
+                            v-if="currentWeather"
                             v-model="isMetric"
                             offText="Imperial"
                             onText="Metric"
                         />
+                        <button
+                            @click="() => router.visit('/alerts')"
+                            class="flex w-full items-center justify-center rounded-md bg-green-500 p-2 text-white"
+                        >
+                            Go to Alerts
+                        </button>
                     </div>
 
                     <!-- Current Weather -->

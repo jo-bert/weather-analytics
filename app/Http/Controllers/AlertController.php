@@ -24,7 +24,7 @@ class AlertController extends Controller
       return $alert;
     });
     return Inertia::render('Locations/Alert', [
-      'locations' => Cache::remember('locations', now()->addMinute(), function () {
+      'locations' => Cache::remember('locations', now()->addHour(), function () {
         return Location::select(['id', 'name', 'country'])->get();
       }),
       'alerts' => $alerts
