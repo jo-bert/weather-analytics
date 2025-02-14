@@ -1,6 +1,6 @@
 # Weather App by Albert Jonathan
 
-## Installation (available in script called install.sh)
+## Installation (available in [install.sh](./install.sh))
 # Project Setup Documentation
 
 Follow these steps to set up the project:
