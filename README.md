@@ -62,9 +62,9 @@ Build a dashboard that includes:
 ## Testing Requirements
 
 ### Laravel Tests
-- [ ] Unit tests for business logic
+- [X] Unit tests for business logic
 - [ ] Feature tests for API endpoints
-- [ ] Integration tests for external API communication
+- [X] Integration tests for external API communication
 
 ### Frontend Tests
 - [ ] Component testing
