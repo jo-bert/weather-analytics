@@ -1,19 +1,21 @@
 # Weather App by Albert Jonathan
 
 ## Installation (available in script called install.sh)
-./vendor/bin/sail composer install
-./vendor/bin/sail bun install
-./vendor/bin/sail cp .env.example .env 
-./vendor/bin/sail up -d
-./vendor/bin/sail artisan key:generate
-./vendor/bin/sail artisan migrate
-./vendor/bin/sail psql \i ./database/functions.sql
-./vendor/bin/sail artisan queue:work
-./vendor/bin/sail artisan queue:listen
+```bash
+./vendor/bin/sail composer install && \
+./vendor/bin/sail bun install && \
+./vendor/bin/sail cp .env.example .env && \
+./vendor/bin/sail up -d && \
+./vendor/bin/sail artisan key:generate && \
+./vendor/bin/sail artisan migrate && \
+./vendor/bin/sail psql \i ./database/functions.sql && \
+./vendor/bin/sail artisan queue:work && \
+./vendor/bin/sail artisan queue:listen && \
 ./vendor/bin/bun run dev
+```
 
-Database schema is in Database ERD.svg
-API Documentation wasn't being made due to time constraints
+- Database schema is in Database ERD.svg   
+- API Documentation wasn't being made due to time constraints
 
 
 # What I have done so far
@@ -77,7 +79,7 @@ Build a dashboard that includes:
 - [ ] API documentation (OpenAPI/Swagger)
 - [X] Database schema documentation
 - [ ] Testing documentation
-## ocker Configuration:
+## Docker Configuration:
 - [X] docker-compose.yml
 - [X] Service Dockerfiles
 - [X] Environment configuration files
