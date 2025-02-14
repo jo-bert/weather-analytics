@@ -1,18 +1,69 @@
 # Weather App by Albert Jonathan
 
 ## Installation (available in script called install.sh)
-```bash
-./vendor/bin/sail composer install && \
-./vendor/bin/sail bun install && \
-./vendor/bin/sail cp .env.example .env && \
-./vendor/bin/sail up -d && \
-./vendor/bin/sail artisan key:generate && \
-./vendor/bin/sail artisan migrate && \
-./vendor/bin/sail psql \i ./database/functions.sql && \
-./vendor/bin/sail artisan queue:work && \
-./vendor/bin/sail artisan queue:listen && \
-./vendor/bin/bun run dev
-```
+# Project Setup Documentation
+
+Follow these steps to set up the project:
+
+1. **Install Composer dependencies:**
+
+    ```bash
+    ./vendor/bin/sail composer install
+    ```
+
+2. **Install Bun dependencies:**
+
+    ```bash
+    ./vendor/bin/sail bun install
+    ```
+
+3. **Copy environment variables:**
+
+    ```bash
+    ./vendor/bin/sail cp .env.example .env
+    ```
+
+4. **Start Sail services in the background:**
+
+    ```bash
+    ./vendor/bin/sail up -d
+    ```
+
+5. **Generate application key:**
+
+    ```bash
+    ./vendor/bin/sail artisan key:generate
+    ```
+
+6. **Run database migrations:**
+
+    ```bash
+    ./vendor/bin/sail artisan migrate
+    ```
+
+7. **Execute SQL functions (optional):**
+
+    ```bash
+    ./vendor/bin/sail psql \i ./database/functions.sql
+    ```
+
+8. **Start queue worker:**
+
+    ```bash
+    ./vendor/bin/sail artisan queue:work
+    ```
+
+9. **Listen for queue jobs:**
+
+    ```bash
+    ./vendor/bin/sail artisan queue:listen
+    ```
+
+10. **Run Bun dev server:**
+
+    ```bash
+    ./vendor/bin/bun run dev
+    ```
 
 - Database schema is in Database ERD.svg   
 - API Documentation wasn't being made due to time constraints
